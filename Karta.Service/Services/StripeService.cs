@@ -1,0 +1,577 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Karta.Model;
+using Karta.Model.Entities;
+using Karta.Service.DTO;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Stripe;
+using Stripe.Checkout;
+
+namespace Karta.Service.Services
+{
+    public interface IStripeService
+    {
+        Task<(Guid orderId, string clientSecret)> CreatePaymentIntentAsync(CreateOrderRequest req, CancellationToken ct = default);
+        Task<(Guid orderId, string sessionId, string url)> CreateCheckoutSessionAsync(CreateCheckoutSessionRequest req, string userId, CancellationToken ct = default);
+        Task HandleWebhookAsync(string json, string? signature, CancellationToken ct = default);
+    }
+
+    public class StripeService : IStripeService
+    {
+        private readonly ApplicationDbContext _context;
+        private readonly IEmailService _emailService;
+        private readonly ILogger<StripeService> _logger;
+        private readonly IConfiguration _configuration;
+        private readonly string _stripeSecretKey;
+        private readonly string _stripeWebhookSecret;
+
+        public StripeService(ApplicationDbContext context, IEmailService emailService, ILogger<StripeService> logger, IConfiguration configuration)
+        {
+            _context = context;
+            _emailService = emailService;
+            _logger = logger;
+            _configuration = configuration;
+            _stripeSecretKey = configuration["Stripe:SecretKey"] ?? throw new ArgumentException("Stripe SecretKey not configured");
+            _stripeWebhookSecret = configuration["Stripe:WebhookSecret"] ?? throw new ArgumentException("Stripe WebhookSecret not configured");
+            
+            StripeConfiguration.ApiKey = _stripeSecretKey;
+        }
+
+        public async Task<(Guid orderId, string clientSecret)> CreatePaymentIntentAsync(CreateOrderRequest req, CancellationToken ct = default)
+        {
+            // Get price tier
+            var priceTier = await _context.PriceTiers
+                .Include(pt => pt.Event)
+                .FirstOrDefaultAsync(pt => pt.Id == req.PriceTierId, ct);
+
+            if (priceTier == null)
+                throw new ArgumentException("Price tier not found");
+
+            // Check availability
+            if (priceTier.Sold + req.Quantity > priceTier.Capacity)
+                throw new InvalidOperationException("Not enough tickets available");
+
+            // Calculate total amount
+            var totalAmount = priceTier.Price * req.Quantity;
+
+            // Create order immediately with Pending status
+            var order = new Order
+            {
+                Id = Guid.NewGuid(),
+                UserId = req.UserId,
+                TotalAmount = totalAmount,
+                Currency = priceTier.Currency,
+                Status = "Pending",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var orderItem = new OrderItem
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                EventId = priceTier.EventId,
+                PriceTierId = priceTier.Id,
+                Qty = req.Quantity,
+                UnitPrice = priceTier.Price
+            };
+
+            // Save to database (stock will be reserved only when payment succeeds)
+            _context.Orders.Add(order);
+            _context.OrderItems.Add(orderItem);
+            await _context.SaveChangesAsync(ct);
+
+            // Create Stripe Payment Intent
+            _logger.LogInformation("Creating Stripe Payment Intent for order {OrderId}, amount: {Amount} {Currency}", order.Id, totalAmount, priceTier.Currency);
+            
+            try
+            {
+                var paymentIntentService = new PaymentIntentService();
+                var paymentIntent = await paymentIntentService.CreateAsync(new PaymentIntentCreateOptions
+                {
+                    Amount = (long)Math.Round(totalAmount * 100m, MidpointRounding.AwayFromZero), // Convert to cents
+                    Currency = priceTier.Currency.ToLower(),
+                    AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions
+                    {
+                        Enabled = true,
+                        AllowRedirects = "if_required"
+                    },
+                    Metadata = new Dictionary<string, string>
+                    {
+                        { "orderId", order.Id.ToString() },
+                        { "userId", req.UserId },
+                        { "eventId", priceTier.EventId.ToString() },
+                        { "priceTierId", priceTier.Id.ToString() },
+                        { "quantity", req.Quantity.ToString() },
+                        { "totalAmount", totalAmount.ToString(System.Globalization.CultureInfo.InvariantCulture) }
+                    }
+                }, new RequestOptions
+                {
+                    IdempotencyKey = $"pi:{order.Id}"
+                }, ct);
+
+                _logger.LogInformation("Stripe Payment Intent created successfully: {PaymentIntentId}", paymentIntent.Id);
+
+                // Update order with Stripe Payment Intent ID
+                order.StripePaymentIntentId = paymentIntent.Id;
+                await _context.SaveChangesAsync(ct);
+
+                return (order.Id, paymentIntent.ClientSecret);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create Stripe Payment Intent for order {OrderId}", order.Id);
+                throw new InvalidOperationException($"Failed to create payment intent: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<(Guid orderId, string sessionId, string url)> CreateCheckoutSessionAsync(CreateCheckoutSessionRequest req, string userId, CancellationToken ct = default)
+        {
+            // Get event and validate
+            var eventEntity = await _context.Events
+                .Include(e => e.PriceTiers)
+                .FirstOrDefaultAsync(e => e.Id == req.EventId, ct);
+
+            if (eventEntity == null)
+                throw new ArgumentException("Event not found");
+
+            // Calculate total amount and validate availability
+            decimal totalAmount = 0;
+            var lineItems = new List<SessionLineItemOptions>();
+
+            foreach (var item in req.Items)
+            {
+                var priceTier = eventEntity.PriceTiers.FirstOrDefault(pt => pt.Id == item.PriceTierId);
+                if (priceTier == null)
+                    throw new ArgumentException($"Price tier {item.PriceTierId} not found");
+
+                if (priceTier.Sold + item.Quantity > priceTier.Capacity)
+                    throw new InvalidOperationException($"Not enough tickets available for {priceTier.Name}");
+
+                var itemTotal = priceTier.Price * item.Quantity;
+                totalAmount += itemTotal;
+
+                lineItems.Add(new SessionLineItemOptions
+                {
+                    PriceData = new SessionLineItemPriceDataOptions
+                    {
+                        UnitAmount = (long)Math.Round(priceTier.Price * 100m, MidpointRounding.AwayFromZero),
+                        Currency = priceTier.Currency.ToLowerInvariant(),
+                        ProductData = new SessionLineItemPriceDataProductDataOptions
+                        {
+                            Name = $"{eventEntity.Title} - {priceTier.Name}",
+                            Description = $"Ticket for {eventEntity.Title}",
+                            Metadata = new Dictionary<string, string>
+                            {
+                                { "priceTierId", priceTier.Id.ToString() },
+                                { "eventId", eventEntity.Id.ToString() }
+                            }
+                        }
+                    },
+                    Quantity = item.Quantity
+                });
+            }
+
+            // Create order with Pending status
+            var order = new Order
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                TotalAmount = totalAmount,
+                Currency = req.Currency,
+                Status = "Pending",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            // Create order items
+            var orderItems = new List<OrderItem>();
+            foreach (var item in req.Items)
+            {
+                var priceTier = eventEntity.PriceTiers.First(pt => pt.Id == item.PriceTierId);
+                
+                orderItems.Add(new OrderItem
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = order.Id,
+                    EventId = eventEntity.Id,
+                    PriceTierId = priceTier.Id,
+                    Qty = item.Quantity,
+                    UnitPrice = priceTier.Price
+                });
+
+                // Note: Stock will be reserved only when payment is successful (in webhook handlers)
+            }
+
+            // Save order to database
+            _context.Orders.Add(order);
+            _context.OrderItems.AddRange(orderItems);
+            await _context.SaveChangesAsync(ct);
+
+            // Create Stripe Checkout Session
+            _logger.LogInformation("Creating Stripe Checkout Session for order {OrderId}, amount: {Amount} {Currency}", 
+                order.Id, totalAmount, req.Currency);
+
+            try
+            {
+                var sessionService = new SessionService();
+                var options = new SessionCreateOptions
+                {
+                    Mode = "payment",
+                    LineItems = lineItems,
+                    SuccessUrl = $"https://localhost:5001/api/order/success?session_id={{CHECKOUT_SESSION_ID}}&order_id={order.Id}",
+                    CancelUrl = $"https://localhost:5001/api/order/cancel?order_id={order.Id}",
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["orderId"] = order.Id.ToString(),
+                        ["userId"] = userId,
+                        ["eventId"] = eventEntity.Id.ToString()
+                    },
+                    ClientReferenceId = order.Id.ToString(),
+                    Locale = "auto",
+                    PaymentIntentData = new SessionPaymentIntentDataOptions
+                    {
+                        Metadata = new Dictionary<string, string>
+                        {
+                            ["orderId"] = order.Id.ToString(),
+                            ["userId"] = userId,
+                            ["eventId"] = eventEntity.Id.ToString()
+                        }
+                    }
+                };
+
+                var session = await sessionService.CreateAsync(options, new RequestOptions
+                {
+                    IdempotencyKey = $"checkout:{order.Id}"
+                }, ct);
+
+                _logger.LogInformation("Stripe Checkout Session created successfully: {SessionId}", session.Id);
+
+                return (order.Id, session.Id, session.Url);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create Stripe Checkout Session for order {OrderId}", order.Id);
+                throw new InvalidOperationException($"Failed to create checkout session: {ex.Message}", ex);
+            }
+        }
+
+        public async Task HandleWebhookAsync(string json, string? signature, CancellationToken ct = default)
+        {
+            try
+            {
+                var stripeEvent = EventUtility.ConstructEvent(json, signature, _stripeWebhookSecret);
+                
+                _logger.LogInformation("Received Stripe webhook event: {EventType} with ID: {EventId}", stripeEvent.Type, stripeEvent.Id);
+
+                switch (stripeEvent.Type)
+                {
+                    case "checkout.session.completed":
+                        _logger.LogInformation("Processing checkout.session.completed event");
+                        await HandleCheckoutSessionCompleted(stripeEvent, ct);
+                        break;
+                    case "payment_intent.succeeded":
+                        _logger.LogInformation("Processing payment_intent.succeeded event");
+                        await HandlePaymentIntentSucceeded(stripeEvent, ct);
+                        break;
+                    case "payment_intent.payment_failed":
+                        _logger.LogInformation("Processing payment_intent.payment_failed event");
+                        await HandlePaymentIntentFailed(stripeEvent, ct);
+                        break;
+                    case "checkout.session.expired":
+                        _logger.LogInformation("Processing checkout.session.expired event");
+                        await HandleCheckoutSessionExpired(stripeEvent, ct);
+                        break;
+                    case "checkout.session.cancelled":
+                        _logger.LogInformation("Processing checkout.session.cancelled event");
+                        await HandleCheckoutSessionCancelled(stripeEvent, ct);
+                        break;
+                    default:
+                        _logger.LogInformation("Unhandled event type: {EventType}", stripeEvent.Type);
+                        break;
+                }
+            }
+            catch (StripeException ex)
+            {
+                _logger.LogError(ex, "Stripe webhook error: {Message}", ex.Message);
+                throw new InvalidOperationException($"Stripe webhook error: {ex.Message}", ex);
+            }
+        }
+
+        private async Task HandleCheckoutSessionCompleted(Stripe.Event stripeEvent, CancellationToken ct)
+        {
+            var session = stripeEvent.Data.Object as Session;
+            if (session == null)
+            {
+                _logger.LogWarning("Session is null in HandleCheckoutSessionCompleted");
+                return;
+            }
+
+            _logger.LogInformation("Processing checkout.session.completed for Session: {SessionId}", session.Id);
+
+            // Get order ID from metadata
+            if (!session.Metadata.TryGetValue("orderId", out var orderIdStr) || !Guid.TryParse(orderIdStr, out var orderId))
+            {
+                _logger.LogWarning("Order ID not found in session metadata: {SessionId}", session.Id);
+                return;
+            }
+
+            // Find order
+            var order = await _context.Orders
+                .Include(o => o.Items)
+                .ThenInclude(oi => oi.Event)
+                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+            if (order == null)
+            {
+                _logger.LogWarning("Order not found for Session: {SessionId}, OrderId: {OrderId}", session.Id, orderId);
+                return;
+            }
+
+            _logger.LogInformation("Found order {OrderId} for Session: {SessionId}", order.Id, session.Id);
+
+            // Check if order is already paid to prevent duplicate processing
+            if (order.Status == "Paid")
+            {
+                _logger.LogInformation("Order {OrderId} already marked as Paid. Skipping.", order.Id);
+                return;
+            }
+
+            // Update order status to Paid
+            order.Status = "Paid";
+            order.StripePaymentIntentId = session.PaymentIntentId;
+
+            // Save changes
+            await _context.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Order {OrderId} marked as Paid via CheckoutSession. Tickets already generated by payment_intent.succeeded handler.", order.Id);
+        }
+
+        private async Task HandlePaymentIntentSucceeded(Stripe.Event stripeEvent, CancellationToken ct)
+        {
+            var paymentIntent = stripeEvent.Data.Object as PaymentIntent;
+            if (paymentIntent == null) 
+            {
+                _logger.LogWarning("PaymentIntent is null in HandlePaymentIntentSucceeded");
+                return;
+            }
+
+            _logger.LogInformation("Processing payment_intent.succeeded for PaymentIntent: {PaymentIntentId}", paymentIntent.Id);
+
+            // Try to find order by StripePaymentIntentId first
+            var order = await _context.Orders
+                .Include(o => o.Items)
+                .ThenInclude(oi => oi.Event)
+                .FirstOrDefaultAsync(o => o.StripePaymentIntentId == paymentIntent.Id, ct);
+
+            // If not found, try to find by metadata (for Checkout flow)
+            if (order == null && paymentIntent.Metadata.TryGetValue("orderId", out var orderIdStr) && Guid.TryParse(orderIdStr, out var orderId))
+            {
+                order = await _context.Orders
+                    .Include(o => o.Items)
+                    .ThenInclude(oi => oi.Event)
+                    .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+            }
+
+            if (order == null) 
+            {
+                _logger.LogWarning("Order not found for PaymentIntent: {PaymentIntentId}", paymentIntent.Id);
+                return;
+            }
+
+            _logger.LogInformation("Found order {OrderId} for PaymentIntent: {PaymentIntentId}", order.Id, paymentIntent.Id);
+
+            // Check if order is already paid to prevent duplicate processing
+            if (order.Status == "Paid")
+            {
+                _logger.LogInformation("Order {OrderId} already marked as Paid. Skipping.", order.Id);
+                return;
+            }
+
+            // Update order status to Paid
+            order.Status = "Paid";
+            order.StripePaymentIntentId = paymentIntent.Id;
+
+            // Reserve stock now that payment is successful
+            foreach (var orderItem in order.Items)
+            {
+                var priceTier = await _context.PriceTiers.FindAsync(orderItem.PriceTierId);
+                if (priceTier != null)
+                {
+                    priceTier.Sold += orderItem.Qty;
+                }
+            }
+
+            // Generate tickets for each order item
+            foreach (var orderItem in order.Items)
+            {
+                for (int i = 0; i < orderItem.Qty; i++)
+                {
+                    var ticket = new Ticket
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderItemId = orderItem.Id,
+                        TicketCode = GenerateTicketCode(),
+                        Status = "Valid",
+                        IssuedAt = DateTime.UtcNow,
+                        QRNonce = Guid.NewGuid().ToString("N")[..32]
+                    };
+                    _context.Tickets.Add(ticket);
+                }
+            }
+
+            // Save changes
+            await _context.SaveChangesAsync(ct);
+
+            // Send ticket confirmation emails
+            await SendTicketConfirmationEmails(order, ct);
+
+            _logger.LogInformation("Order {OrderId} successfully processed and marked as Paid", order.Id);
+        }
+
+        private async Task SendTicketConfirmationEmails(Order order, CancellationToken ct)
+        {
+            try
+            {
+                // Get user email
+                var user = await _context.Users.FindAsync(order.UserId);
+                if (user?.Email == null) return;
+
+                // Get event details
+                var orderItems = await _context.OrderItems
+                    .Include(oi => oi.Event)
+                    .Include(oi => oi.Tickets)
+                    .Where(oi => oi.OrderId == order.Id)
+                    .ToListAsync(ct);
+
+                foreach (var orderItem in orderItems)
+                {
+                    foreach (var ticket in orderItem.Tickets)
+                    {
+                        await _emailService.SendTicketConfirmationAsync(
+                            user.Email,
+                            orderItem.Event.Title,
+                            ticket.TicketCode,
+                            ct);
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Log error but don't fail the payment process
+                // In a real application, you might want to queue these emails for retry
+            }
+        }
+
+        private async Task HandlePaymentIntentFailed(Stripe.Event stripeEvent, CancellationToken ct)
+        {
+            var paymentIntent = stripeEvent.Data.Object as PaymentIntent;
+            if (paymentIntent == null) return;
+
+            var order = await _context.Orders
+                .Include(o => o.Items)
+                .FirstOrDefaultAsync(o => o.StripePaymentIntentId == paymentIntent.Id, ct);
+
+            if (order == null) return;
+
+            // Update order status
+            order.Status = "Failed";
+
+            // No need to release stock since it was never reserved for Payment Intent flow
+            await _context.SaveChangesAsync(ct);
+        }
+
+        private async Task HandleCheckoutSessionExpired(Stripe.Event stripeEvent, CancellationToken ct)
+        {
+            var session = stripeEvent.Data.Object as Session;
+            if (session == null)
+            {
+                _logger.LogWarning("Session is null in HandleCheckoutSessionExpired");
+                return;
+            }
+
+            _logger.LogInformation("Processing checkout.session.expired for Session: {SessionId}", session.Id);
+
+            // Get order ID from metadata
+            if (!session.Metadata.TryGetValue("orderId", out var orderIdStr) || !Guid.TryParse(orderIdStr, out var orderId))
+            {
+                _logger.LogWarning("Order ID not found in session metadata: {SessionId}", session.Id);
+                return;
+            }
+
+            // Find order
+            var order = await _context.Orders
+                .Include(o => o.Items)
+                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+            if (order == null)
+            {
+                _logger.LogWarning("Order not found for Session: {SessionId}, OrderId: {OrderId}", session.Id, orderId);
+                return;
+            }
+
+            // Only update if still pending
+            if (order.Status == "Pending")
+            {
+                order.Status = "Expired";
+                await _context.SaveChangesAsync(ct);
+                _logger.LogInformation("Order {OrderId} marked as Expired for Session: {SessionId}", order.Id, session.Id);
+            }
+            else
+            {
+                _logger.LogInformation("Order {OrderId} is no longer Pending (Status: {Status}), skipping expiration", order.Id, order.Status);
+            }
+        }
+
+        private async Task HandleCheckoutSessionCancelled(Stripe.Event stripeEvent, CancellationToken ct)
+        {
+            var session = stripeEvent.Data.Object as Session;
+            if (session == null)
+            {
+                _logger.LogWarning("Session is null in HandleCheckoutSessionCancelled");
+                return;
+            }
+
+            _logger.LogInformation("Processing checkout.session.cancelled for Session: {SessionId}", session.Id);
+
+            // Get order ID from metadata
+            if (!session.Metadata.TryGetValue("orderId", out var orderIdStr) || !Guid.TryParse(orderIdStr, out var orderId))
+            {
+                _logger.LogWarning("Order ID not found in session metadata: {SessionId}", session.Id);
+                return;
+            }
+
+            // Find order
+            var order = await _context.Orders
+                .Include(o => o.Items)
+                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+            if (order == null)
+            {
+                _logger.LogWarning("Order not found for Session: {SessionId}, OrderId: {OrderId}", session.Id, orderId);
+                return;
+            }
+
+            // Only update if still pending
+            if (order.Status == "Pending")
+            {
+                order.Status = "Cancelled";
+                await _context.SaveChangesAsync(ct);
+                _logger.LogInformation("Order {OrderId} marked as Cancelled for Session: {SessionId}", order.Id, session.Id);
+            }
+            else
+            {
+                _logger.LogInformation("Order {OrderId} is no longer Pending (Status: {Status}), skipping cancellation", order.Id, order.Status);
+            }
+        }
+
+        private string GenerateTicketCode()
+        {
+            // Generate a unique ticket code
+            return $"TK{DateTime.UtcNow:yyyyMMdd}{Guid.NewGuid().ToString("N")[..8].ToUpper()}";
+        }
+    }
+}

@@ -1,0 +1,44 @@
+# Environment Variables
+.env
+.env.local
+.env.production
+.env.staging
+
+# Environment Templates (keep these in version control)
+!env.example
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+logs/
+*.log
+
+# Build outputs
+bin/
+obj/
+*.dll
+*.pdb
+*.so
+*.dylib
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test projects (exclude from backend push)
+Karta.Tests/
+Karta.IntegrationTests/
+Karta.LoadTests/
+Karta.PerformanceTests/
+
+# Desktop application (exclude from backend push)
+karta_desktop/
