@@ -40,5 +40,3 @@ Karta.IntegrationTests/
 Karta.LoadTests/
 Karta.PerformanceTests/
 
-# Desktop application (exclude from backend push)
-karta_desktop/
