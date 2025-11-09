@@ -3,9 +3,14 @@
 .env.local
 .env.production
 .env.staging
+env
+env.local
+env.production
+env.staging
 
 # Environment Templates (keep these in version control)
 !env.example
+!env.production.example
 
 # Database
 *.db
