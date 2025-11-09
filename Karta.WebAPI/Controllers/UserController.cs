@@ -1,0 +1,332 @@
+using Karta.Model;
+using Karta.Service.DTO;
+using Karta.Service.Interfaces;
+using Karta.WebAPI.Authorization;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Swashbuckle.AspNetCore.Annotations;
+using System.Security.Claims;
+using System.Linq;
+
+namespace Karta.WebAPI.Controllers
+{
+    /// <summary>
+    /// Kontroler za upravljanje korisnicima (Admin funkcionalnosti)
+    /// </summary>
+    [ApiController]
+    [Route("api/[controller]")]
+    [SwaggerTag("Upravljanje korisnicima - Admin funkcionalnosti")]
+    public class UserController : ControllerBase
+    {
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IOrderService _orderService;
+        private readonly ILogger<UserController> _logger;
+        private readonly Karta.Service.Services.IEmailService _emailService;
+
+        public UserController(
+            UserManager<ApplicationUser> userManager,
+            IOrderService orderService,
+            ILogger<UserController> logger,
+            Karta.Service.Services.IEmailService emailService)
+        {
+            _userManager = userManager;
+            _orderService = orderService;
+            _logger = logger;
+            _emailService = emailService;
+        }
+
+        /// <summary>
+        /// Vraća detalje korisnika po ID-u
+        /// </summary>
+        [HttpGet("{id}")]
+        [RequirePermission("ManageUsers")]
+        [SwaggerOperation(
+            Summary = "Vraća detalje korisnika",
+            Description = "Vraća detaljne informacije o korisniku sa njegovim rolama"
+        )]
+        [SwaggerResponse(200, "Korisnik pronađen", typeof(UserDetailResponse))]
+        [SwaggerResponse(401, "Neautorizovan pristup")]
+        [SwaggerResponse(403, "Nedovoljna prava")]
+        [SwaggerResponse(404, "Korisnik nije pronađen")]
+        public async Task<ActionResult<UserDetailResponse>> GetUser(string id)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                _logger.LogWarning("User not found: {UserId}", id);
+                return NotFound(new { message = "Korisnik nije pronađen" });
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+
+            var response = new UserDetailResponse(
+                Id: user.Id,
+                Email: user.Email ?? string.Empty,
+                FirstName: user.FirstName ?? string.Empty,
+                LastName: user.LastName ?? string.Empty,
+                EmailConfirmed: user.EmailConfirmed,
+                CreatedAt: user.CreatedAt,
+                LastLoginAt: user.LastLoginAt,
+                Roles: roles.ToArray()
+            );
+
+            return Ok(response);
+        }
+
+        /// <summary>
+        /// Ažurira informacije o korisniku
+        /// </summary>
+        [HttpPut("{id}")]
+        [RequirePermission("ManageUsers")]
+        [SwaggerOperation(
+            Summary = "Ažurira korisnika",
+            Description = "Ažurira osnovne informacije o korisniku (ime, prezime, email, email confirmed status)"
+        )]
+        [SwaggerResponse(200, "Korisnik uspješno ažuriran", typeof(UserDetailResponse))]
+        [SwaggerResponse(400, "Neispravni podaci")]
+        [SwaggerResponse(401, "Neautorizovan pristup")]
+        [SwaggerResponse(403, "Nedovoljna prava")]
+        [SwaggerResponse(404, "Korisnik nije pronađen")]
+        public async Task<ActionResult<UserDetailResponse>> UpdateUser(string id, [FromBody] UpdateUserRequest request)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                _logger.LogWarning("User not found for update: {UserId}", id);
+                return NotFound(new { message = "Korisnik nije pronađen" });
+            }
+
+            // Ažuriraj polja koja su navedena
+            if (!string.IsNullOrEmpty(request.FirstName))
+            {
+                user.FirstName = request.FirstName;
+            }
+
+            if (!string.IsNullOrEmpty(request.LastName))
+            {
+                user.LastName = request.LastName;
+            }
+
+            if (!string.IsNullOrEmpty(request.Email) && request.Email != user.Email)
+            {
+                // Provjeri da li email već postoji
+                var existingUser = await _userManager.FindByEmailAsync(request.Email);
+                if (existingUser != null && existingUser.Id != user.Id)
+                {
+                    return BadRequest(new { message = "Email adresa već postoji" });
+                }
+
+                user.Email = request.Email;
+                user.UserName = request.Email;
+                user.NormalizedEmail = _userManager.NormalizeEmail(request.Email);
+                user.NormalizedUserName = _userManager.NormalizeEmail(request.Email); // Username je email, koristi NormalizeEmail
+            }
+
+            if (request.EmailConfirmed.HasValue)
+            {
+                user.EmailConfirmed = request.EmailConfirmed.Value;
+            }
+
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                _logger.LogError("Failed to update user {UserId}: {Errors}", 
+                    id, string.Join(", ", result.Errors.Select(e => e.Description)));
+                return BadRequest(new { message = "Greška pri ažuriranju korisnika", errors = result.Errors });
+            }
+
+            _logger.LogInformation("User {UserId} updated successfully", id);
+
+            // Vrati ažurirane podatke
+            var roles = await _userManager.GetRolesAsync(user);
+            var response = new UserDetailResponse(
+                Id: user.Id,
+                Email: user.Email ?? string.Empty,
+                FirstName: user.FirstName ?? string.Empty,
+                LastName: user.LastName ?? string.Empty,
+                EmailConfirmed: user.EmailConfirmed,
+                CreatedAt: user.CreatedAt,
+                LastLoginAt: user.LastLoginAt,
+                Roles: roles.ToArray()
+            );
+
+            return Ok(response);
+        }
+
+        /// <summary>
+        /// Briše korisnika
+        /// </summary>
+        [HttpDelete("{id}")]
+        [RequirePermission("ManageUsers")]
+        [SwaggerOperation(
+            Summary = "Briše korisnika",
+            Description = "Trajno briše korisnika iz sistema. Ova akcija je nepovratna."
+        )]
+        [SwaggerResponse(200, "Korisnik uspješno obrisan")]
+        [SwaggerResponse(401, "Neautorizovan pristup")]
+        [SwaggerResponse(403, "Nedovoljna prava")]
+        [SwaggerResponse(404, "Korisnik nije pronađen")]
+        public async Task<IActionResult> DeleteUser(string id)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                _logger.LogWarning("User not found for deletion: {UserId}", id);
+                return NotFound(new { message = "Korisnik nije pronađen" });
+            }
+
+            // Provjeri da li korisnik pokušava obrisati samog sebe
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (currentUserId == id)
+            {
+                return BadRequest(new { message = "Ne možete obrisati vlastiti nalog" });
+            }
+
+            var result = await _userManager.DeleteAsync(user);
+            if (!result.Succeeded)
+            {
+                _logger.LogError("Failed to delete user {UserId}: {Errors}", 
+                    id, string.Join(", ", result.Errors.Select(e => e.Description)));
+                return BadRequest(new { message = "Greška pri brisanju korisnika", errors = result.Errors });
+            }
+
+            _logger.LogInformation("User {UserId} ({Email}) deleted successfully", id, user.Email);
+            return Ok(new { message = $"Korisnik '{user.Email}' je uspješno obrisan" });
+        }
+
+        /// <summary>
+        /// Vraća sve narudžbe korisnika
+        /// </summary>
+        [HttpGet("{id}/orders")]
+        [RequirePermission("ManageUsers")]
+        [SwaggerOperation(
+            Summary = "Vraća narudžbe korisnika",
+            Description = "Vraća listu svih narudžbi određenog korisnika"
+        )]
+        [SwaggerResponse(200, "Lista narudžbi", typeof(IReadOnlyList<OrderDto>))]
+        [SwaggerResponse(401, "Neautorizovan pristup")]
+        [SwaggerResponse(403, "Nedovoljna prava")]
+        [SwaggerResponse(404, "Korisnik nije pronađen")]
+        public async Task<ActionResult<IReadOnlyList<OrderDto>>> GetUserOrders(string id, CancellationToken ct = default)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                _logger.LogWarning("User not found: {UserId}", id);
+                return NotFound(new { message = "Korisnik nije pronađen" });
+            }
+
+            // Koristi IOrderService za dohvaćanje narudžbi korisnika
+            var orders = await _orderService.GetMyOrdersAsync(id, ct);
+            
+            _logger.LogInformation("Retrieved {Count} orders for user {UserId}", orders.Count, id);
+            return Ok(orders);
+        }
+
+        /// <summary>
+        /// Kreira novog korisnika (samo Admin)
+        /// </summary>
+        [HttpPost]
+        [RequirePermission("ManageUsers")]
+        [SwaggerOperation(
+            Summary = "Kreira novog korisnika",
+            Description = "Kreira novog korisnika sa zadanim podacima. Admin može eksplicitno dodijeliti rolu."
+        )]
+        [SwaggerResponse(201, "Korisnik uspješno kreiran", typeof(UserDetailResponse))]
+        [SwaggerResponse(400, "Neispravni podaci")]
+        [SwaggerResponse(401, "Neautorizovan pristup")]
+        [SwaggerResponse(403, "Nedovoljna prava")]
+        public async Task<ActionResult<UserDetailResponse>> CreateUser([FromBody] CreateUserRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            // Provjeri da li korisnik sa tim emailom već postoji
+            var existingUser = await _userManager.FindByEmailAsync(request.Email);
+            if (existingUser != null)
+            {
+                _logger.LogWarning("Attempt to create user with existing email: {Email}", request.Email);
+                return BadRequest(new { message = "Korisnik sa ovom email adresom već postoji" });
+            }
+
+            var user = new ApplicationUser
+            {
+                UserName = request.Email,
+                Email = request.Email,
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                EmailConfirmed = false, // Email nije potvrđen - korisnik mora potvrditi preko emaila
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var result = await _userManager.CreateAsync(user, request.Password);
+            if (!result.Succeeded)
+            {
+                _logger.LogError("Failed to create user {Email}: {Errors}", 
+                    request.Email, string.Join(", ", result.Errors.Select(e => e.Description)));
+                return BadRequest(new { message = "Greška pri kreiranju korisnika", errors = result.Errors });
+            }
+
+            _logger.LogInformation("User {UserId} ({Email}) created successfully", user.Id, user.Email);
+
+            // Dodijeli rolu ako je navedena
+            if (!string.IsNullOrEmpty(request.RoleName))
+            {
+                var validRoles = new[] { "User", "Organizer", "Scanner", "Admin" };
+                if (validRoles.Contains(request.RoleName))
+                {
+                    var roleResult = await _userManager.AddToRoleAsync(user, request.RoleName);
+                    if (!roleResult.Succeeded)
+                    {
+                        _logger.LogWarning("Failed to assign role {Role} to user {UserId}: {Errors}", 
+                            request.RoleName, user.Id, string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Role {Role} assigned to user {UserId}", request.RoleName, user.Id);
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Invalid role specified: {Role}", request.RoleName);
+                }
+            }
+
+            // Generiši email confirmation token i pošalji email za aktivaciju
+            try
+            {
+                var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                var confirmationLink = Url.Action("ConfirmEmail", "Auth", new { userId = user.Id, token }, Request.Scheme, Request.Host.Value);
+                
+                // Pošalji email za potvrdu
+                await _emailService.SendEmailConfirmationAsync(user.Email!, confirmationLink!);
+                
+                _logger.LogInformation("Email confirmation sent to: {Email}", user.Email);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send email confirmation to {Email}", user.Email);
+                // Ne vraćamo grešku jer je korisnik već kreiran - samo logujemo
+            }
+
+            // Vrati kreiranog korisnika
+            var roles = await _userManager.GetRolesAsync(user);
+            var response = new UserDetailResponse(
+                Id: user.Id,
+                Email: user.Email ?? string.Empty,
+                FirstName: user.FirstName ?? string.Empty,
+                LastName: user.LastName ?? string.Empty,
+                EmailConfirmed: user.EmailConfirmed,
+                CreatedAt: user.CreatedAt,
+                LastLoginAt: user.LastLoginAt,
+                Roles: roles.ToArray()
+            );
+
+            return CreatedAtAction(nameof(GetUser), new { id = user.Id }, response);
+        }
+    }
+}
+

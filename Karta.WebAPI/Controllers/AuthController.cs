@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using System.Security.Claims;
+using System.Linq;
 using Karta.WebAPI.Authorization;
 
 namespace Karta.WebAPI.Controllers
@@ -47,24 +48,52 @@ namespace Karta.WebAPI.Controllers
         /// Registracija novog korisnika
         /// </summary>
         /// <param name="request">Podaci za registraciju korisnika</param>
+        /// <param name="clientType">Tip klijenta (X-Client-Type header): karta_desktop ili karta_mobile</param>
         /// <returns>Poruka o uspješnoj registraciji</returns>
         /// <response code="200">Korisnik je uspješno registriran</response>
         /// <response code="400">Neispravni podaci ili korisnik već postoji</response>
+        /// <remarks>
+        /// Rola se automatski dodjeljuje na osnovu tipa klijenta:
+        /// - karta_desktop → Organizer
+        /// - karta_mobile → User
+        /// - Nije naveden ili nepoznat → User (default)
+        /// </remarks>
         [HttpPost("register")]
         [SwaggerOperation(
             Summary = "Registracija novog korisnika",
-            Description = "Kreira novi korisnički račun i šalje email za potvrdu"
+            Description = "Kreira novi korisnički račun i automatski dodjeljuje rolu na osnovu tipa klijenta. Šalje email za potvrdu."
         )]
         [SwaggerResponse(200, "Korisnik je uspješno registriran", typeof(object))]
         [SwaggerResponse(400, "Neispravni podaci ili korisnik već postoji", typeof(ApiErrorResponse))]
-        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+        public async Task<IActionResult> Register(
+            [FromBody] RegisterRequest request,
+            [FromHeader(Name = "X-Client-Type")] string? clientType = null)
         {
+            // Alternativni način čitanja header-a (ako [FromHeader] ne radi)
+            if (string.IsNullOrEmpty(clientType))
+            {
+                clientType = Request.Headers["X-Client-Type"].FirstOrDefault();
+            }
+            
+            // Debug: Provjeri sve header-e
             _logger.LogInformation("User registration attempt for email: {Email}", request.Email);
+            _logger.LogInformation("X-Client-Type header value (FromHeader): {ClientType}", 
+                Request.Headers["X-Client-Type"].FirstOrDefault() ?? "NULL");
+            _logger.LogInformation("X-Client-Type header value (parameter): {ClientType}", clientType ?? "NULL");
 
             if (!ModelState.IsValid)
             {
                 _logger.LogWarning("Invalid model state for user registration: {Email}", request.Email);
                 return BadRequest(ModelState);
+            }
+
+            // Validacija client type (opciono, ali ako je naveden mora biti validan)
+            var allowedClientTypes = new[] { "karta_desktop", "karta_mobile" };
+            if (!string.IsNullOrEmpty(clientType) && !allowedClientTypes.Contains(clientType))
+            {
+                _logger.LogWarning("Invalid client type provided: {ClientType} for email: {Email}", 
+                    clientType, request.Email);
+                return BadRequest(new { message = "Invalid client type. Must be 'karta_desktop' or 'karta_mobile'." });
             }
 
             var user = new ApplicationUser
@@ -80,6 +109,46 @@ namespace Karta.WebAPI.Controllers
             if (result.Succeeded)
             {
                 _logger.LogInformation("User successfully registered: {UserId}, {Email}", user.Id, user.Email);
+                
+                // Automatski određivanje i dodjeljivanje role na osnovu tipa klijenta
+                string roleToAssign = DetermineDefaultRole(clientType);
+                
+                _logger.LogInformation("Attempting to assign role {Role} to user {Email} (ClientType: {ClientType})", 
+                    roleToAssign, user.Email, clientType ?? "not specified");
+                
+                var roleManager = HttpContext.RequestServices.GetRequiredService<RoleManager<ApplicationRole>>();
+                
+                // Provjeri da li rola postoji (kao u CoreRoleController)
+                var role = await roleManager.FindByNameAsync(roleToAssign);
+                if (role == null)
+                {
+                    _logger.LogWarning("Role '{RoleName}' not found in database. User {Email} registered without role.", 
+                        roleToAssign, user.Email);
+                }
+                else
+                {
+                    // Provjeri da li korisnik već ima neku rolu (ne bi trebalo za novog korisnika, ali za sigurnost)
+                    var existingRoles = await _userManager.GetRolesAsync(user);
+                    if (existingRoles.Any())
+                    {
+                        _logger.LogInformation("User {Email} already has roles: {Roles}. Removing before assigning new role.", 
+                            user.Email, string.Join(", ", existingRoles));
+                        await _userManager.RemoveFromRolesAsync(user, existingRoles);
+                    }
+                    
+                    // Dodaj rolu (kao u CoreRoleController)
+                    var roleResult = await _userManager.AddToRoleAsync(user, roleToAssign);
+                    if (roleResult.Succeeded)
+                    {
+                        _logger.LogInformation("✅ Role '{Role}' successfully assigned to user: {Email} (ClientType: {ClientType})", 
+                            roleToAssign, user.Email, clientType ?? "not specified");
+                    }
+                    else
+                    {
+                        _logger.LogError("❌ Failed to assign role '{Role}' to user {Email}: {Errors}", 
+                            roleToAssign, user.Email, string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+                    }
+                }
                 
                 // Generate email confirmation token
                 var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
@@ -528,6 +597,21 @@ namespace Karta.WebAPI.Controllers
             }
 
             return Ok(response);
+        }
+
+        /// <summary>
+        /// Određuje default rolu na osnovu tipa klijenta
+        /// </summary>
+        /// <param name="clientType">Tip klijenta (karta_desktop ili karta_mobile)</param>
+        /// <returns>Ime role koja će biti dodijeljena</returns>
+        private string DetermineDefaultRole(string? clientType)
+        {
+            return clientType switch
+            {
+                "karta_desktop" => "Organizer",  // Desktop aplikacija → Organizer
+                "karta_mobile" => "User",         // Mobile aplikacija → User
+                _ => "User"                        // Default fallback (najsigurniji)
+            };
         }
     }
 

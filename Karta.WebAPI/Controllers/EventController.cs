@@ -42,6 +42,29 @@ namespace Karta.WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpGet("all")]
+        [Authorize]
+        [SwaggerOperation(Summary = "Dohvata sve evente za admin panel (uključujući archived)", 
+                         Description = "Vraća sve evente sa mogućnošću filtriranja po statusu. Dostupno samo za autentifikovane korisnike.")]
+        [SwaggerResponse(200, "Uspešno vraćena lista eventa", typeof(PagedResult<EventDto>))]
+        [SwaggerResponse(401, "Korisnik nije autentifikovan")]
+        public async Task<ActionResult<PagedResult<EventDto>>> GetAllEvents(
+            [FromQuery] string? query,
+            [FromQuery] string? category,
+            [FromQuery] string? city,
+            [FromQuery] string? status,
+            [FromQuery] DateTimeOffset? from,
+            [FromQuery] DateTimeOffset? to,
+            [FromQuery] int page = 1,
+            [FromQuery] int size = 20)
+        {
+            if (page < 1) page = 1;
+            if (size < 1 || size > 100) size = 20;
+
+            var result = await _eventService.GetAllEventsAsync(query, category, city, status, from, to, page, size);
+            return Ok(result);
+        }
+
         [HttpGet("{id}")]
         public async Task<ActionResult<EventDto>> GetEvent(Guid id)
         {

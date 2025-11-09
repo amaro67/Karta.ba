@@ -29,7 +29,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      print('❌ Form validation failed');
+      return;
+    }
+
+    print('✅ Form validation passed');
+    print('📝 Logging in user: ${_emailController.text.trim()}');
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
@@ -39,13 +45,20 @@ class _LoginScreenState extends State<LoginScreen> {
       rememberMe: _rememberMe,
     );
 
+    print('📊 Login result: success=$success, error=${authProvider.error}');
+    print('👤 Current user: ${authProvider.currentUser?.email}');
+    print('🔐 Is authenticated: ${authProvider.isAuthenticated}');
+
     if (success && mounted) {
+      print('✅ Login successful');
       // Navigation will be handled by the main app based on auth state
-    } else if (mounted && authProvider.error != null) {
+    } else if (mounted) {
+      print('❌ Login failed: ${authProvider.error}');
+      final errorMessage = authProvider.error ?? 'Login failed. Please check your credentials.';
       ErrorDialog.show(
         context,
         title: 'Login Failed',
-        message: authProvider.error!,
+        message: errorMessage,
       );
     }
   }
@@ -117,6 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         // Email field
                         BaseTextField(
+                          key: const ValueKey('email_field'),
                           label: 'Email',
                           hint: 'Enter your email',
                           controller: _emailController,
@@ -136,6 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         // Password field
                         BaseTextField(
+                          key: const ValueKey('password_field'),
                           label: 'Password',
                           hint: 'Enter your password',
                           controller: _passwordController,
@@ -180,9 +195,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 24),
 
                         // Login button
-                        Consumer<AuthProvider>(
-                          builder: (context, authProvider, child) {
-                            if (authProvider.isLoading) {
+                        Selector<AuthProvider, bool>(
+                          selector: (context, authProvider) => authProvider.isLoading,
+                          builder: (context, isLoading, child) {
+                            if (isLoading) {
                               return const LoadingWidget(
                                 message: 'Signing in...',
                                 size: 20,

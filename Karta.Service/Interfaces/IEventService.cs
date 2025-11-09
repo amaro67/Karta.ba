@@ -11,6 +11,9 @@ public interface IEventService
     Task<PagedResult<EventDto>> GetEventsAsync(string? query, string? category, string? city,
         DateTimeOffset? from, DateTimeOffset? to, int page, int size, CancellationToken ct = default);
 
+    Task<PagedResult<EventDto>> GetAllEventsAsync(string? query, string? category, string? city,
+        string? status, DateTimeOffset? from, DateTimeOffset? to, int page, int size, CancellationToken ct = default);
+
     Task<EventDto?> GetEventAsync(Guid id, CancellationToken ct = default);
     Task<EventDto> CreateEventAsync(CreateEventRequest req, string userId, CancellationToken ct = default);
     Task<EventDto> UpdateEventAsync(Guid id, UpdateEventRequest req, string userId, CancellationToken ct = default);

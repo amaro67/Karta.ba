@@ -105,6 +105,95 @@ namespace Karta.Service.Services
             };
         }
 
+        public async Task<PagedResult<EventDto>> GetAllEventsAsync(string? query, string? category, string? city,
+            string? status, DateTimeOffset? from, DateTimeOffset? to, int page, int size, CancellationToken ct = default)
+        {
+            var eventsQuery = _context.Events
+                .Include(e => e.PriceTiers)
+                .AsQueryable();
+
+            // Apply filters
+            if (!string.IsNullOrEmpty(query))
+            {
+                eventsQuery = eventsQuery.Where(e => 
+                    e.Title.Contains(query) || 
+                    e.Description!.Contains(query) ||
+                    e.Venue.Contains(query));
+            }
+
+            if (!string.IsNullOrEmpty(category))
+            {
+                eventsQuery = eventsQuery.Where(e => e.Category == category);
+            }
+
+            if (!string.IsNullOrEmpty(city))
+            {
+                eventsQuery = eventsQuery.Where(e => e.City == city);
+            }
+
+            if (!string.IsNullOrEmpty(status))
+            {
+                eventsQuery = eventsQuery.Where(e => e.Status == status);
+            }
+
+            if (from.HasValue)
+            {
+                eventsQuery = eventsQuery.Where(e => e.StartsAt >= from.Value);
+            }
+
+            if (to.HasValue)
+            {
+                eventsQuery = eventsQuery.Where(e => e.StartsAt <= to.Value);
+            }
+
+            // NOTE: Ne filtriramo archived - vraćamo SVE evente za admin panel
+
+            var total = await eventsQuery.CountAsync(ct);
+
+            // Load events into memory first, then sort by DateTime (SQLite limitation)
+            var eventsList = await eventsQuery
+                .Select(e => new EventDto(
+                    e.Id,
+                    e.Title,
+                    e.Slug,
+                    e.Description,
+                    e.Venue,
+                    e.City,
+                    e.Country,
+                    e.StartsAt,
+                    e.EndsAt,
+                    e.Category,
+                    e.Tags,
+                    e.Status,
+                    e.CoverImageUrl,
+                    e.CreatedAt,
+                    e.PriceTiers.Select(pt => new PriceTierDto(
+                        pt.Id,
+                        pt.Name,
+                        pt.Price,
+                        pt.Currency,
+                        pt.Capacity,
+                        pt.Sold
+                    )).ToList()
+                ))
+                .ToListAsync(ct);
+
+            // Sort by DateTime in memory (SQLite limitation)
+            var sortedEvents = eventsList
+                .OrderBy(e => e.StartsAt.DateTime)
+                .Skip((page - 1) * size)
+                .Take(size)
+                .ToList();
+
+            return new PagedResult<EventDto>
+            {
+                Items = sortedEvents,
+                Page = page,
+                Size = size,
+                Total = total
+            };
+        }
+
         public async Task<EventDto?> GetEventAsync(Guid id, CancellationToken ct = default)
         {
             var eventEntity = await _context.Events

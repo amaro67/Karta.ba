@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/admin_provider.dart';
+import 'providers/event_provider.dart';
+import 'providers/order_provider.dart';
+import 'providers/ticket_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/profile/profile_screen.dart';
+import 'widgets/admin_layout.dart';
 
 void main() {
   runApp(const KartaDesktopApp());
@@ -16,6 +21,22 @@ class KartaDesktopApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, AdminProvider>(
+          create: (_) => AdminProvider(AuthProvider()),
+          update: (_, authProvider, __) => AdminProvider(authProvider),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, EventProvider>(
+          create: (_) => EventProvider(AuthProvider()),
+          update: (_, authProvider, __) => EventProvider(authProvider),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, OrderProvider>(
+          create: (_) => OrderProvider(AuthProvider()),
+          update: (_, authProvider, __) => OrderProvider(authProvider),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, TicketProvider>(
+          create: (_) => TicketProvider(AuthProvider()),
+          update: (_, authProvider, __) => TicketProvider(authProvider),
+        ),
       ],
       child: MaterialApp(
         title: 'Karta Desktop',
@@ -62,21 +83,52 @@ class AppWrapper extends StatefulWidget {
 }
 
 class _AppWrapperState extends State<AppWrapper> {
+  bool _isInitializing = false;
+
   @override
   void initState() {
     super.initState();
-    // Initialize auth state
+    // Uvijek pozovi initialize pri pokretanju
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<AuthProvider>(context, listen: false).initialize();
+      _initializeAuth();
     });
+  }
+
+  Future<void> _initializeAuth() async {
+    // Spriječi višestruko pozivanje
+    if (_isInitializing) {
+      print('⚠️ Already initializing, skipping...');
+      return;
+    }
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // Ako već ima podatke u memoriji, ne treba ponovo učitavati
+    if (authProvider.currentUser != null && authProvider.accessToken != null) {
+      print('✅ Auth already initialized, user: ${authProvider.currentUser?.email}');
+      return;
+    }
+
+    print('🔵 Initializing auth from storage...');
+    _isInitializing = true;
+    
+    try {
+      await authProvider.initialize();
+      print('✅ Auth initialization complete');
+    } catch (e) {
+      print('🔴 Error initializing auth: $e');
+    } finally {
+      _isInitializing = false;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
-        // Show loading screen while initializing
-        if (authProvider.isLoading && authProvider.currentUser == null) {
+        // Show loading screen only during initial app startup initialization
+        // Don't show loading if user is already authenticated (e.g., after login)
+        if (_isInitializing && authProvider.currentUser == null) {
           return const Scaffold(
             body: Center(
               child: Column(
@@ -97,6 +149,11 @@ class _AppWrapperState extends State<AppWrapper> {
         }
 
         // Show main app if authenticated
+        // Redirect admin users to admin portal with sidebar
+        final user = authProvider.currentUser!;
+        if (user.isAdmin) {
+          return const AdminLayout();
+        }
         return const MainApp();
       },
     );

@@ -64,6 +64,49 @@ namespace Karta.Service.Services
             );
         }
 
+        public async Task<OrderDto?> GetOrderByIdAsync(Guid id, CancellationToken ct = default)
+        {
+            var order = await _context.Orders
+                .Include(o => o.Items)
+                    .ThenInclude(oi => oi.Tickets)
+                .FirstOrDefaultAsync(o => o.Id == id, ct);
+
+            if (order == null)
+                return null;
+
+            // Get user information
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Id == order.UserId, ct);
+
+            var orderItems = order.Items.Select(oi => new OrderItemDto(
+                oi.Id,
+                oi.EventId,
+                oi.PriceTierId,
+                oi.Qty,
+                oi.UnitPrice,
+                oi.Tickets.Select(t => new TicketDto(
+                    t.Id,
+                    t.TicketCode,
+                    t.Status,
+                    t.IssuedAt,
+                    t.UsedAt
+                )).ToList()
+            )).ToList();
+
+            return new OrderDto(
+                order.Id,
+                order.UserId,
+                order.TotalAmount,
+                order.Currency,
+                order.Status,
+                order.CreatedAt,
+                orderItems,
+                user?.FirstName,
+                user?.LastName,
+                user?.Email
+            );
+        }
+
         public async Task<IReadOnlyList<OrderDto>> GetMyOrdersAsync(string userId, CancellationToken ct = default)
         {
             var orders = await _context.Orders
@@ -95,6 +138,130 @@ namespace Karta.Service.Services
                     )).ToList()
                 )).ToList()
             )).ToList();
+        }
+
+        public async Task<PagedResult<OrderDto>> GetAllOrdersAsync(string? query, string? userId, string? status, DateTimeOffset? from, DateTimeOffset? to, int page, int size, CancellationToken ct = default)
+        {
+            var ordersQuery = _context.Orders
+                .Include(o => o.Items)
+                    .ThenInclude(oi => oi.Tickets)
+                .AsQueryable();
+
+            // Apply search query filter (order ID, user name, email)
+            if (!string.IsNullOrEmpty(query))
+            {
+                // Try to parse as Guid for order ID search
+                if (Guid.TryParse(query, out var orderId))
+                {
+                    ordersQuery = ordersQuery.Where(o => o.Id == orderId);
+                }
+                else
+                {
+                    // Search by user first name, last name, or email (case-insensitive)
+                    // Load users into memory first due to SQLite limitations with ToLower()
+                    var allUsers = await _context.Users
+                        .Select(u => new { u.Id, u.FirstName, u.LastName, u.Email })
+                        .ToListAsync(ct);
+
+                    var queryLower = query.ToLower();
+                    var matchingUserIds = allUsers
+                        .Where(u => 
+                            (u.FirstName != null && u.FirstName.ToLower().Contains(queryLower)) || 
+                            (u.LastName != null && u.LastName.ToLower().Contains(queryLower)) || 
+                            (u.Email != null && u.Email.ToLower().Contains(queryLower)))
+                        .Select(u => u.Id)
+                        .ToList();
+
+                    if (matchingUserIds.Any())
+                    {
+                        ordersQuery = ordersQuery.Where(o => matchingUserIds.Contains(o.UserId));
+                    }
+                    else
+                    {
+                        // No matching users found, return empty result
+                        ordersQuery = ordersQuery.Where(o => false);
+                    }
+                }
+            }
+
+            // Apply filters
+            if (!string.IsNullOrEmpty(userId))
+            {
+                ordersQuery = ordersQuery.Where(o => o.UserId == userId);
+            }
+
+            if (!string.IsNullOrEmpty(status))
+            {
+                ordersQuery = ordersQuery.Where(o => o.Status == status);
+            }
+
+            if (from.HasValue)
+            {
+                ordersQuery = ordersQuery.Where(o => o.CreatedAt >= from.Value);
+            }
+
+            if (to.HasValue)
+            {
+                ordersQuery = ordersQuery.Where(o => o.CreatedAt <= to.Value);
+            }
+
+            var total = await ordersQuery.CountAsync(ct);
+
+            // Load orders into memory first, then sort by DateTime (SQLite limitation)
+            var ordersList = await ordersQuery
+                .OrderByDescending(o => o.CreatedAt)
+                .Skip((page - 1) * size)
+                .Take(size)
+                .ToListAsync(ct);
+
+            // Get all user IDs from orders
+            var userIds = ordersList.Select(o => o.UserId).Distinct().ToList();
+            
+            // Load user information
+            var users = await _context.Users
+                .Where(u => userIds.Contains(u.Id))
+                .Select(u => new { u.Id, u.FirstName, u.LastName, u.Email })
+                .ToListAsync(ct);
+            
+            var userDict = users.ToDictionary(u => u.Id);
+
+            var ordersDto = ordersList.Select(order => 
+            {
+                var user = userDict.GetValueOrDefault(order.UserId);
+                return new OrderDto(
+                    order.Id,
+                    order.UserId,
+                    order.TotalAmount,
+                    order.Currency,
+                    order.Status,
+                    order.CreatedAt,
+                    order.Items.Select(oi => new OrderItemDto(
+                        oi.Id,
+                        oi.EventId,
+                        oi.PriceTierId,
+                        oi.Qty,
+                        oi.UnitPrice,
+                        oi.Tickets.Select(t => new TicketDto(
+                            t.Id,
+                            t.TicketCode,
+                            t.Status,
+                            t.IssuedAt,
+                            t.UsedAt
+                        )).ToList()
+                    )).ToList(),
+                    user?.FirstName,
+                    user?.LastName,
+                    user?.Email
+                );
+            }).ToList();
+
+            return new PagedResult<OrderDto>
+            {
+                Items = ordersDto,
+                Page = page,
+                Size = size,
+                Total = total
+            };
         }
 
         public async Task HandleStripeWebhookAsync(string json, string? signature, CancellationToken ct = default)

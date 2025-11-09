@@ -104,6 +104,21 @@ namespace Karta.WebAPI.Controllers
             return Ok(order);
         }
 
+        [HttpGet("admin/{id}")]
+        [RequirePermission("ViewAllOrders")]
+        [ProducesResponseType(typeof(OrderDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<OrderDto>> GetOrderAdmin(Guid id, CancellationToken ct = default)
+        {
+            var order = await _orderService.GetOrderByIdAsync(id, ct);
+            if (order == null)
+                return NotFound();
+
+            return Ok(order);
+        }
+
         [HttpGet("my-orders")]
         [ProducesResponseType(typeof(IReadOnlyList<OrderDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -115,6 +130,28 @@ namespace Karta.WebAPI.Controllers
 
             var orders = await _orderService.GetMyOrdersAsync(userId, ct);
             return Ok(orders);
+        }
+
+        [HttpGet("all")]
+        [RequirePermission("ViewAllOrders")]
+        [ProducesResponseType(typeof(PagedResult<OrderDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<ActionResult<PagedResult<OrderDto>>> GetAllOrders(
+            [FromQuery] string? query,
+            [FromQuery] string? userId,
+            [FromQuery] string? status,
+            [FromQuery] DateTimeOffset? from,
+            [FromQuery] DateTimeOffset? to,
+            [FromQuery] int page = 1,
+            [FromQuery] int size = 20,
+            CancellationToken ct = default)
+        {
+            if (page < 1) page = 1;
+            if (size < 1 || size > 100) size = 20;
+
+            var result = await _orderService.GetAllOrdersAsync(query, userId, status, from, to, page, size, ct);
+            return Ok(result);
         }
 
         [HttpPost("webhook")]

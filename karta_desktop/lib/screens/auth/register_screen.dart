@@ -33,7 +33,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _handleRegister() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      print('❌ Form validation failed');
+      return;
+    }
+
+    print('✅ Form validation passed');
+    print('📝 Registering user: ${_emailController.text.trim()}');
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
@@ -44,7 +50,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _lastNameController.text.trim(),
     );
 
+    print('📊 Registration result: success=$success, error=${authProvider.error}');
+
     if (success && mounted) {
+      print('✅ Registration successful');
       // Show success message and navigate back to login
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -54,11 +63,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
       // Navigate back to login screen
       Navigator.of(context).pop();
-    } else if (mounted && authProvider.error != null) {
+    } else if (mounted) {
+      print('❌ Registration failed: ${authProvider.error}');
+      final errorMessage = authProvider.error ?? 'Registration failed. Please try again.';
       ErrorDialog.show(
         context,
         title: 'Registration Failed',
-        message: authProvider.error!,
+        message: errorMessage,
       );
     }
   }

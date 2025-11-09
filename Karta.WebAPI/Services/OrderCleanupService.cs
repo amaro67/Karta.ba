@@ -44,12 +44,27 @@ namespace Karta.WebAPI.Services
                 {
                     await CleanupExpiredOrders(stoppingToken);
                 }
+                catch (OperationCanceledException)
+                {
+                    // Expected when service is stopping
+                    _logger.LogInformation("OrderCleanupService is stopping");
+                    break;
+                }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error occurred during order cleanup");
                 }
 
-                await Task.Delay(_cleanupInterval, stoppingToken);
+                try
+                {
+                    await Task.Delay(_cleanupInterval, stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected when service is stopping
+                    _logger.LogInformation("OrderCleanupService is stopping");
+                    break;
+                }
             }
 
             _logger.LogInformation("OrderCleanupService stopped");

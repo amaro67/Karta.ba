@@ -171,10 +171,21 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("RestrictedCors", policy =>
     {
-        policy.WithOrigins("http://localhost:57841", "https://localhost:3000", "http://localhost:3000")
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials();
+        // Allow all localhost origins for development (Flutter web uses random ports)
+        policy.SetIsOriginAllowed(origin =>
+        {
+            if (string.IsNullOrWhiteSpace(origin)) return false;
+            
+            // Allow localhost and 127.0.0.1 with any port
+            var uri = new Uri(origin);
+            return uri.Host == "localhost" || 
+                   uri.Host == "127.0.0.1" || 
+                   uri.Host == "::1" ||
+                   allowedOrigins.Contains(origin);
+        })
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials();
     });
 });
 

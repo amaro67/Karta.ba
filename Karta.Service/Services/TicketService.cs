@@ -116,6 +116,89 @@ namespace Karta.Service.Services
             );
         }
 
+        public async Task<PagedResult<TicketDto>> GetAllTicketsAsync(string? query, string? status, string? userId, Guid? eventId, DateTimeOffset? from, DateTimeOffset? to, int page, int size, CancellationToken ct = default)
+        {
+            var ticketsQuery = _context.Tickets
+                .Include(t => t.OrderItem)
+                    .ThenInclude(oi => oi.Order)
+                .AsQueryable();
+
+            // Apply filters
+            if (!string.IsNullOrEmpty(query))
+            {
+                // Search by ticket code
+                ticketsQuery = ticketsQuery.Where(t => t.TicketCode.Contains(query));
+            }
+
+            if (!string.IsNullOrEmpty(status))
+            {
+                ticketsQuery = ticketsQuery.Where(t => t.Status == status);
+            }
+
+            if (!string.IsNullOrEmpty(userId))
+            {
+                ticketsQuery = ticketsQuery.Where(t => t.OrderItem.Order.UserId == userId);
+            }
+
+            if (eventId.HasValue)
+            {
+                ticketsQuery = ticketsQuery.Where(t => t.OrderItem.EventId == eventId.Value);
+            }
+
+            if (from.HasValue)
+            {
+                ticketsQuery = ticketsQuery.Where(t => t.IssuedAt >= from.Value);
+            }
+
+            if (to.HasValue)
+            {
+                ticketsQuery = ticketsQuery.Where(t => t.IssuedAt <= to.Value);
+            }
+
+            var total = await ticketsQuery.CountAsync(ct);
+
+            var tickets = await ticketsQuery
+                .OrderByDescending(t => t.IssuedAt)
+                .Skip((page - 1) * size)
+                .Take(size)
+                .ToListAsync(ct);
+
+            var ticketsDto = tickets.Select(t => new TicketDto(
+                t.Id,
+                t.TicketCode,
+                t.Status,
+                t.IssuedAt,
+                t.UsedAt
+            )).ToList();
+
+            return new PagedResult<TicketDto>
+            {
+                Items = ticketsDto,
+                Page = page,
+                Size = size,
+                Total = total
+            };
+        }
+
+        public async Task<TicketDto?> GetTicketByIdAsync(Guid id, CancellationToken ct = default)
+        {
+            var ticket = await _context.Tickets
+                .Include(t => t.OrderItem)
+                    .ThenInclude(oi => oi.Order)
+                .FirstOrDefaultAsync(t => t.Id == id, ct);
+
+            if (ticket == null)
+                return null;
+
+            return new TicketDto(
+                ticket.Id,
+                ticket.TicketCode,
+                ticket.Status,
+                ticket.IssuedAt,
+                ticket.UsedAt
+            );
+        }
+
         private async Task LogScanAsync(Guid ticketId, string gateId, string result, CancellationToken ct)
         {
             var scanLog = new ScanLog

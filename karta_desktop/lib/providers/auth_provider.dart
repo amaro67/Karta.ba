@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import '../model/auth/auth_response.dart';
 import '../model/auth/login_request.dart';
@@ -9,7 +10,13 @@ import '../model/auth/user_info.dart';
 import '../utils/api_client.dart';
 
 class AuthProvider extends ChangeNotifier {
+  // Koristi FlutterSecureStorage za desktop/mobile, shared_preferences za web
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  static const String _accessTokenKey = 'access_token';
+  static const String _refreshTokenKey = 'refresh_token';
+  
+  // Provjeri da li je web platforma
+  bool get _isWeb => kIsWeb;
   
   UserInfo? _currentUser;
   String? _accessToken;
@@ -27,30 +34,87 @@ class AuthProvider extends ChangeNotifier {
 
   // Initialize auth state from storage
   Future<void> initialize() async {
+    // Ako već imamo podatke u memoriji, ne treba ponovo učitavati
+    if (_currentUser != null && _accessToken != null) {
+      print('✅ AuthProvider: Already initialized, skipping...');
+      return;
+    }
+
+    // Ako je već u procesu inicijalizacije, preskoči
+    if (_isLoading) {
+      print('⚠️ AuthProvider: Already initializing, skipping...');
+      return;
+    }
+
+    print('🔵 AuthProvider: Starting initialization from storage... (Platform: ${_isWeb ? "Web" : "Desktop/Mobile"})');
     _setLoading(true);
     try {
-      _accessToken = await _secureStorage.read(key: 'access_token');
-      _refreshToken = await _secureStorage.read(key: 'refresh_token');
+      if (_isWeb) {
+        // Za web, koristi shared_preferences
+        final prefs = await SharedPreferences.getInstance();
+        _accessToken = prefs.getString(_accessTokenKey);
+        _refreshToken = prefs.getString(_refreshTokenKey);
+        print('🔵 AuthProvider: Read from SharedPreferences');
+      } else {
+        // Za desktop/mobile, koristi FlutterSecureStorage
+        // Add timeout to prevent hanging
+        _accessToken = await _secureStorage.read(key: _accessTokenKey)
+            .timeout(const Duration(seconds: 5), onTimeout: () {
+              print('⚠️ AuthProvider: Timeout reading access token from storage');
+              return null;
+            });
+        _refreshToken = await _secureStorage.read(key: _refreshTokenKey)
+            .timeout(const Duration(seconds: 5), onTimeout: () {
+              print('⚠️ AuthProvider: Timeout reading refresh token from storage');
+              return null;
+            });
+        print('🔵 AuthProvider: Read from FlutterSecureStorage');
+      }
+      
+      print('🔵 AuthProvider: Token from storage - AccessToken: ${_accessToken != null ? "exists (${_accessToken!.length} chars)" : "null"}, RefreshToken: ${_refreshToken != null ? "exists" : "null"}');
       
       if (_accessToken != null) {
         // Check if token is expired
-        if (JwtDecoder.isExpired(_accessToken!)) {
+        final isExpired = JwtDecoder.isExpired(_accessToken!);
+        print('🔵 AuthProvider: Token expired: $isExpired');
+        
+        if (isExpired) {
           // Try to refresh token
           if (_refreshToken != null) {
-            await _refreshAccessToken();
+            print('🔵 AuthProvider: Attempting to refresh token...');
+            try {
+              await _refreshAccessToken();
+              print('✅ AuthProvider: Token refreshed successfully');
+            } catch (e) {
+              print('🔴 AuthProvider: Failed to refresh token: $e');
+              // Clear auth data on refresh failure
+              await _clearAuthData();
+            }
           } else {
+            print('⚠️ AuthProvider: Token expired and no refresh token, clearing auth');
             await _clearAuthData();
           }
         } else {
           // Token is valid, decode user info
-          final payload = JwtDecoder.decode(_accessToken!);
-          _currentUser = UserInfo.fromJson(payload);
+          try {
+            final payload = JwtDecoder.decode(_accessToken!);
+            _currentUser = UserInfo.fromJson(payload);
+            print('✅ AuthProvider: Successfully decoded user: ${_currentUser?.email}');
+          } catch (e) {
+            // Ako ne može parsirati token, obriši ga
+            print('🔴 AuthProvider: Error decoding token: $e');
+            await _clearAuthData();
+          }
         }
+      } else {
+        print('⚠️ AuthProvider: No access token found in storage');
       }
     } catch (e) {
+      print('🔴 AuthProvider: Error initializing auth: $e');
       await _clearAuthData();
     } finally {
       _setLoading(false);
+      print('🔵 AuthProvider: Initialization complete. Authenticated: ${isAuthenticated}');
     }
   }
 
@@ -160,12 +224,49 @@ class AuthProvider extends ChangeNotifier {
 
   // Save authentication data
   Future<void> _saveAuthData(AuthResponse response) async {
+    print('🔵 AuthProvider: Saving auth data...');
     _accessToken = response.accessToken;
     _refreshToken = response.refreshToken;
     _currentUser = response.user;
     
-    await _secureStorage.write(key: 'access_token', value: _accessToken);
-    await _secureStorage.write(key: 'refresh_token', value: _refreshToken);
+    print('🔵 AuthProvider: Writing tokens to storage... (Platform: ${_isWeb ? "Web" : "Desktop/Mobile"})');
+    
+    if (_isWeb) {
+      // Za web, koristi shared_preferences
+      final prefs = await SharedPreferences.getInstance();
+      if (_accessToken != null) {
+        await prefs.setString(_accessTokenKey, _accessToken!);
+      }
+      if (_refreshToken != null) {
+        await prefs.setString(_refreshTokenKey, _refreshToken!);
+      }
+      print('🔵 AuthProvider: Saved to SharedPreferences');
+      
+      // Provjeri da li su se tokeni stvarno sačuvali
+      final savedAccessToken = prefs.getString(_accessTokenKey);
+      final savedRefreshToken = prefs.getString(_refreshTokenKey);
+      print('✅ AuthProvider: Tokens saved - AccessToken: ${savedAccessToken != null ? "saved (${savedAccessToken.length} chars)" : "NOT SAVED"}, RefreshToken: ${savedRefreshToken != null ? "saved" : "NOT SAVED"}');
+    } else {
+      // Za desktop/mobile, koristi FlutterSecureStorage
+      // Add timeout to prevent hanging
+      try {
+        await _secureStorage.write(key: _accessTokenKey, value: _accessToken)
+            .timeout(const Duration(seconds: 5));
+        await _secureStorage.write(key: _refreshTokenKey, value: _refreshToken)
+            .timeout(const Duration(seconds: 5));
+        print('🔵 AuthProvider: Saved to FlutterSecureStorage');
+        
+        // Provjeri da li su se tokeni stvarno sačuvali (sa timeoutom)
+        final savedAccessToken = await _secureStorage.read(key: _accessTokenKey)
+            .timeout(const Duration(seconds: 5), onTimeout: () => null);
+        final savedRefreshToken = await _secureStorage.read(key: _refreshTokenKey)
+            .timeout(const Duration(seconds: 5), onTimeout: () => null);
+        print('✅ AuthProvider: Tokens saved - AccessToken: ${savedAccessToken != null ? "saved (${savedAccessToken.length} chars)" : "NOT SAVED"}, RefreshToken: ${savedRefreshToken != null ? "saved" : "NOT SAVED"}');
+      } catch (e) {
+        print('🔴 AuthProvider: Error saving to FlutterSecureStorage: $e');
+        // Continue anyway - tokens are in memory
+      }
+    }
     
     notifyListeners();
   }
@@ -176,8 +277,26 @@ class AuthProvider extends ChangeNotifier {
     _accessToken = null;
     _refreshToken = null;
     
-    await _secureStorage.delete(key: 'access_token');
-    await _secureStorage.delete(key: 'refresh_token');
+    if (_isWeb) {
+      // Za web, koristi shared_preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_accessTokenKey);
+      await prefs.remove(_refreshTokenKey);
+      print('🔵 AuthProvider: Cleared from SharedPreferences');
+    } else {
+      // Za desktop/mobile, koristi FlutterSecureStorage
+      // Add timeout to prevent hanging
+      try {
+        await _secureStorage.delete(key: _accessTokenKey)
+            .timeout(const Duration(seconds: 5));
+        await _secureStorage.delete(key: _refreshTokenKey)
+            .timeout(const Duration(seconds: 5));
+        print('🔵 AuthProvider: Cleared from FlutterSecureStorage');
+      } catch (e) {
+        print('⚠️ AuthProvider: Error clearing FlutterSecureStorage: $e');
+        // Continue anyway - tokens are cleared from memory
+      }
+    }
     
     notifyListeners();
   }
@@ -192,10 +311,20 @@ class AuthProvider extends ChangeNotifier {
         refreshToken: _refreshToken!,
       );
       
-      final response = await ApiClient.refreshToken(request);
+      // Add timeout to prevent hanging
+      final response = await ApiClient.refreshToken(request)
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              print('🔴 AuthProvider: Refresh token timeout');
+              throw Exception('Refresh token request timed out');
+            },
+          );
       await _saveAuthData(response);
     } catch (e) {
+      print('🔴 AuthProvider: Error refreshing token: $e');
       await _clearAuthData();
+      rethrow; // Re-throw to let initialize() handle it
     }
   }
 

@@ -47,6 +47,7 @@ class BaseTextField extends StatelessWidget {
           obscureText: obscureText,
           keyboardType: keyboardType,
           validator: validator,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           onChanged: onChanged,
           enabled: enabled,
           maxLines: maxLines,
