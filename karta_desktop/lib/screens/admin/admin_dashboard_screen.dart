@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/admin_provider.dart';
-import '../profile/profile_screen.dart';
+import 'user_detail_screen.dart';
 import 'user_management_screen.dart';
 import 'event_management_screen.dart';
 import 'order_management_screen.dart';
@@ -41,7 +41,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   if (value == 'profile') {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (context) => const ProfileScreen(),
+                        builder: (context) => UserDetailScreen(
+                          isOwnProfile: true,
+                          user: {
+                            'id': user.id,
+                            'email': user.email,
+                            'firstName': user.firstName,
+                            'lastName': user.lastName,
+                            'emailConfirmed': user.emailConfirmed,
+                            'roles': user.roles,
+                          },
+                        ),
                       ),
                     );
                   } else if (value == 'logout') {

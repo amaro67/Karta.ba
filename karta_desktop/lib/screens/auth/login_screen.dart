@@ -54,10 +54,10 @@ class _LoginScreenState extends State<LoginScreen> {
       // Navigation will be handled by the main app based on auth state
     } else if (mounted) {
       print('❌ Login failed: ${authProvider.error}');
-      final errorMessage = authProvider.error ?? 'Login failed. Please check your credentials.';
+      final errorMessage = authProvider.error ?? 'Neispravna email adresa ili lozinka';
       ErrorDialog.show(
         context,
-        title: 'Login Failed',
+        title: 'Prijava neuspješna',
         message: errorMessage,
       );
     }

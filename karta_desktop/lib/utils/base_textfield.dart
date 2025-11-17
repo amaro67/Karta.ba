@@ -38,10 +38,12 @@ class BaseTextField extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF212121),
+            fontSize: 13,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         TextFormField(
           controller: controller,
           obscureText: obscureText,
@@ -52,46 +54,57 @@ class BaseTextField extends StatelessWidget {
           enabled: enabled,
           maxLines: maxLines,
           maxLength: maxLength,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Color(0xFF212121),
+          ),
           decoration: InputDecoration(
             hintText: hint,
+            hintStyle: const TextStyle(
+              color: Color(0xFF9E9E9E),
+              fontSize: 14,
+            ),
             suffixIcon: suffixIcon,
             prefixIcon: prefixIcon,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(
+                color: Color(0xFFE0E0E0),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                color: Theme.of(context).colorScheme.outline,
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(
+                color: Color(0xFFE0E0E0),
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(
                 color: Theme.of(context).colorScheme.primary,
                 width: 2,
               ),
             ),
             errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                color: Theme.of(context).colorScheme.error,
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(
+                color: Colors.red,
               ),
             ),
             focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                color: Theme.of(context).colorScheme.error,
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(
+                color: Colors.red,
                 width: 2,
               ),
             ),
             filled: true,
             fillColor: enabled 
-                ? Theme.of(context).colorScheme.surface
-                : Theme.of(context).colorScheme.surfaceVariant,
+                ? Colors.white
+                : const Color(0xFFF5F5F5),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
-              vertical: 12,
+              vertical: 16,
             ),
           ),
         ),

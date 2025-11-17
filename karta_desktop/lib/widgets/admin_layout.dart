@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/auth_provider.dart';
 import '../providers/admin_provider.dart';
-import '../screens/profile/profile_screen.dart';
+import '../screens/admin/user_detail_screen.dart';
 import 'admin_sidebar.dart';
 import '../screens/admin/user_management_screen.dart';
 import '../screens/admin/event_management_screen.dart';
@@ -63,83 +63,142 @@ class _AdminLayoutState extends State<AdminLayout> {
                   children: [
                     // Top App Bar
                     Container(
-                      height: 64,
+                      height: 70,
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
+                        color: Colors.white,
                         border: Border(
                           bottom: BorderSide(
-                            color: Theme.of(context).dividerColor,
+                            color: Colors.grey.shade200,
                             width: 1,
                           ),
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.02),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 0),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
+                          // Page Title
                           Text(
                             _getTitleForIndex(_selectedIndex),
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey.shade900,
+                            ),
                           ),
+                          // Right side: Notifications and User
                           Row(
                             children: [
-                              IconButton(
-                                icon: const Icon(Icons.notifications_outlined),
-                                onPressed: () {
-                                  // TODO: Show notifications
-                                },
-                                tooltip: 'Notifications',
+                              // Notifications
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: IconButton(
+                                  icon: Icon(
+                                    Icons.notifications_outlined,
+                                    color: Colors.grey.shade700,
+                                    size: 20,
+                                  ),
+                                  onPressed: () {
+                                    // TODO: Show notifications
+                                  },
+                                  tooltip: 'Notifications',
+                                ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 12),
+                              // User Profile
                               PopupMenuButton<String>(
+                                offset: const Offset(0, 50),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 onSelected: (value) {
                                   if (value == 'profile') {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (context) => const ProfileScreen(),
+                                        builder: (context) => UserDetailScreen(
+                                          isOwnProfile: true,
+                                          user: {
+                                            'id': user.id,
+                                            'email': user.email,
+                                            'firstName': user.firstName,
+                                            'lastName': user.lastName,
+                                            'emailConfirmed': user.emailConfirmed,
+                                            'roles': user.roles,
+                                          },
+                                        ),
                                       ),
                                     );
                                   } else if (value == 'logout') {
                                     authProvider.logout();
                                   }
                                 },
-                                child: Row(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 16,
-                                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                      child: Text(
-                                        user.firstName.isNotEmpty
-                                            ? user.firstName[0].toUpperCase()
-                                            : 'A',
-                                        style: TextStyle(
-                                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                          fontWeight: FontWeight.bold,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 16,
+                                        backgroundColor: Theme.of(context).colorScheme.primary,
+                                        child: Text(
+                                          user.firstName.isNotEmpty
+                                              ? user.firstName[0].toUpperCase()
+                                              : 'A',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      user.fullName,
-                                      style: Theme.of(context).textTheme.bodyMedium,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Icon(
-                                      Icons.arrow_drop_down,
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                    ),
-                                  ],
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        user.fullName,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.grey.shade900,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Icon(
+                                        Icons.arrow_drop_down,
+                                        color: Colors.grey.shade600,
+                                        size: 20,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                                 itemBuilder: (context) => [
                                   PopupMenuItem(
                                     value: 'profile',
                                     child: Row(
-                                      children: const [
-                                        Icon(Icons.person, size: 20),
-                                        SizedBox(width: 8),
-                                        Text('Profile'),
+                                      children: [
+                                        Icon(Icons.person_outline, size: 20, color: Colors.grey.shade700),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          'Profile',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey.shade900,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -147,10 +206,16 @@ class _AdminLayoutState extends State<AdminLayout> {
                                   PopupMenuItem(
                                     value: 'logout',
                                     child: Row(
-                                      children: const [
-                                        Icon(Icons.logout, size: 20, color: Colors.red),
-                                        SizedBox(width: 8),
-                                        Text('Logout', style: TextStyle(color: Colors.red)),
+                                      children: [
+                                        Icon(Icons.logout, size: 20, color: Colors.red.shade600),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          'Logout',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.red.shade600,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),

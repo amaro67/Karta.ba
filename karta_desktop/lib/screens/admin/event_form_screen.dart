@@ -39,6 +39,12 @@ class _EventFormScreenState extends State<EventFormScreen> {
     } else {
       _countryController.text = 'Bosnia and Herzegovina';
     }
+    // Add listener to update image preview
+    _coverImageUrlController.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   void _populateForm(EventDto event) {
@@ -182,264 +188,537 @@ class _EventFormScreenState extends State<EventFormScreen> {
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-            BaseTextField(
-              key: const ValueKey('title_field'),
-              label: 'Title *',
-              hint: 'Enter event title',
-              controller: _titleController,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Title is required';
-                }
-                if (value.length > 200) {
-                  return 'Title must be less than 200 characters';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            BaseTextField(
-              key: const ValueKey('description_field'),
-              label: 'Description',
-              hint: 'Enter event description',
-              controller: _descriptionController,
-              maxLines: 5,
-              maxLength: 2000,
-            ),
-            const SizedBox(height: 16),
-            BaseTextField(
-              key: const ValueKey('venue_field'),
-              label: 'Venue *',
-              hint: 'Enter venue name',
-              controller: _venueController,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Venue is required';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: BaseTextField(
-                    key: const ValueKey('city_field'),
-                    label: 'City *',
-                    hint: 'Enter city',
-                    controller: _cityController,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'City is required';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: BaseTextField(
-                    key: const ValueKey('country_field'),
-                    label: 'Country *',
-                    hint: 'Enter country',
-                    controller: _countryController,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Country is required';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            BaseTextField(
-              key: const ValueKey('category_field'),
-              label: 'Category *',
-              hint: 'Enter category (e.g., Music, Sports, Theater)',
-              controller: _categoryController,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Category is required';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            BaseTextField(
-              key: const ValueKey('tags_field'),
-              label: 'Tags',
-              hint: 'Comma-separated tags',
-              controller: _tagsController,
-            ),
-            const SizedBox(height: 16),
-            BaseTextField(
-              key: const ValueKey('cover_image_field'),
-              label: 'Cover Image URL',
-              hint: 'Enter image URL',
-              controller: _coverImageUrlController,
-            ),
-            const SizedBox(height: 16),
-            // Date pickers
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Start Date & Time *',
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
-                      ),
-                      const SizedBox(height: 8),
-                      InkWell(
-                        onTap: () => _selectDate(context, true),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Basic Information Section
+                    _SectionCard(
+                      title: 'Basic Information',
+                      icon: Icons.info_outline,
+                      child: Column(
+                        children: [
+                          BaseTextField(
+                            key: const ValueKey('title_field'),
+                            label: 'Title *',
+                            hint: 'Enter event title',
+                            controller: _titleController,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Title is required';
+                              }
+                              if (value.length > 200) {
+                                return 'Title must be less than 200 characters';
+                              }
+                              return null;
+                            },
                           ),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: Theme.of(context).colorScheme.outline,
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                            color: Theme.of(context).colorScheme.surface,
+                          const SizedBox(height: 20),
+                          BaseTextField(
+                            key: const ValueKey('description_field'),
+                            label: 'Description',
+                            hint: 'Enter event description',
+                            controller: _descriptionController,
+                            maxLines: 5,
+                            maxLength: 2000,
                           ),
-                          child: Row(
+                          const SizedBox(height: 20),
+                          Row(
                             children: [
-                              Icon(
-                                Icons.calendar_today,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 8),
                               Expanded(
-                                child: Text(
-                                  _startsAt != null
-                                      ? DateFormat('MMM dd, yyyy HH:mm')
-                                          .format(_startsAt!)
-                                      : 'Select start date',
-                                  style: TextStyle(
-                                    color: _startsAt != null
-                                        ? Theme.of(context).colorScheme.onSurface
-                                        : Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
+                                child: BaseTextField(
+                                  key: const ValueKey('category_field'),
+                                  label: 'Category *',
+                                  hint: 'e.g., Music, Sports, Theater',
+                                  controller: _categoryController,
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Category is required';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: BaseTextField(
+                                  key: const ValueKey('tags_field'),
+                                  label: 'Tags',
+                                  hint: 'Comma-separated tags',
+                                  controller: _tagsController,
                                 ),
                               ),
                             ],
                           ),
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'End Date & Time',
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
-                      ),
-                      const SizedBox(height: 8),
-                      InkWell(
-                        onTap: () => _selectDate(context, false),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
+                    ),
+                    const SizedBox(height: 20),
+                    // Location Section
+                    _SectionCard(
+                      title: 'Location',
+                      icon: Icons.location_on_outlined,
+                      child: Column(
+                        children: [
+                          BaseTextField(
+                            key: const ValueKey('venue_field'),
+                            label: 'Venue *',
+                            hint: 'Enter venue name',
+                            controller: _venueController,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Venue is required';
+                              }
+                              return null;
+                            },
                           ),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: Theme.of(context).colorScheme.outline,
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                            color: Theme.of(context).colorScheme.surface,
-                          ),
-                          child: Row(
+                          const SizedBox(height: 20),
+                          Row(
                             children: [
-                              Icon(
-                                Icons.calendar_today,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 8),
                               Expanded(
-                                child: Text(
-                                  _endsAt != null
-                                      ? DateFormat('MMM dd, yyyy HH:mm')
-                                          .format(_endsAt!)
-                                      : 'Select end date (optional)',
-                                  style: TextStyle(
-                                    color: _endsAt != null
-                                        ? Theme.of(context).colorScheme.onSurface
-                                        : Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
+                                child: BaseTextField(
+                                  key: const ValueKey('city_field'),
+                                  label: 'City *',
+                                  hint: 'Enter city',
+                                  controller: _cityController,
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'City is required';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: BaseTextField(
+                                  key: const ValueKey('country_field'),
+                                  label: 'Country *',
+                                  hint: 'Enter country',
+                                  controller: _countryController,
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Country is required';
+                                    }
+                                    return null;
+                                  },
                                 ),
                               ),
                             ],
                           ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Date & Time Section
+                    _SectionCard(
+                      title: 'Date & Time',
+                      icon: Icons.calendar_today_outlined,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _DatePickerField(
+                              label: 'Start Date & Time *',
+                              value: _startsAt,
+                              onTap: () => _selectDate(context, true),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _DatePickerField(
+                              label: 'End Date & Time',
+                              value: _endsAt,
+                              onTap: () => _selectDate(context, false),
+                              isOptional: true,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Media Section
+                    _SectionCard(
+                      title: 'Media',
+                      icon: Icons.image_outlined,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          BaseTextField(
+                            key: const ValueKey('cover_image_field'),
+                            label: 'Cover Image URL',
+                            hint: 'Enter image URL',
+                            controller: _coverImageUrlController,
+                          ),
+                          if (_coverImageUrlController.text.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                _coverImageUrlController.text,
+                                width: double.infinity,
+                                height: 200,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  height: 200,
+                                  color: const Color(0xFFF5F5F5),
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.broken_image,
+                                      color: Color(0xFF9E9E9E),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (widget.event != null) ...[
+                      const SizedBox(height: 20),
+                      // Status Section
+                      _SectionCard(
+                        title: 'Status',
+                        icon: Icons.flag_outlined,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: const Color(0xFFE0E0E0),
+                            ),
+                          ),
+                          child: DropdownButtonFormField<String>(
+                            value: _status,
+                            decoration: InputDecoration(
+                              labelText: 'Status',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                              filled: true,
+                              fillColor: Colors.transparent,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                            ),
+                            items: [
+                              DropdownMenuItem(
+                                value: 'Draft',
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.orange,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text('Draft'),
+                                  ],
+                                ),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Published',
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.green,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text('Published'),
+                                  ],
+                                ),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Cancelled',
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text('Cancelled'),
+                                  ],
+                                ),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Archived',
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.grey,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text('Archived'),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _status = value);
+                              }
+                            },
+                          ),
                         ),
                       ),
                     ],
-                  ),
+                    const SizedBox(height: 32),
+                    // Submit Button
+                    Container(
+                      width: double.infinity,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleSubmit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : Text(
+                                widget.event == null ? 'Create Event' : 'Update Event',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            if (widget.event != null) ...[
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _status,
-                decoration: InputDecoration(
-                  labelText: 'Status',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'Draft', child: Text('Draft')),
-                  DropdownMenuItem(value: 'Published', child: Text('Published')),
-                  DropdownMenuItem(value: 'Cancelled', child: Text('Cancelled')),
-                  DropdownMenuItem(value: 'Archived', child: Text('Archived')),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _status = value);
-                  }
-                },
-              ),
-            ],
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _handleSubmit,
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(widget.event == null ? 'Create Event' : 'Update Event'),
               ),
             ),
-            ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Widget child;
+
+  const _SectionCard({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE0E0E0),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  icon,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF212121),
+                      fontSize: 20,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _DatePickerField extends StatelessWidget {
+  final String label;
+  final DateTime? value;
+  final VoidCallback onTap;
+  final bool isOptional;
+
+  const _DatePickerField({
+    required this.label,
+    required this.value,
+    required this.onTap,
+    this.isOptional = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF212121),
+                fontSize: 13,
+              ),
+        ),
+        const SizedBox(height: 10),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: value != null
+                    ? Theme.of(context).colorScheme.primary.withOpacity(0.3)
+                    : const Color(0xFFE0E0E0),
+                width: value != null ? 1.5 : 1,
+              ),
+              borderRadius: BorderRadius.circular(10),
+              color: Colors.white,
+              boxShadow: value != null
+                  ? [
+                      BoxShadow(
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: value != null
+                        ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                        : const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(
+                    Icons.calendar_today,
+                    color: value != null
+                        ? Theme.of(context).colorScheme.primary
+                        : const Color(0xFF757575),
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    value != null
+                        ? DateFormat('MMM dd, yyyy HH:mm').format(value!)
+                        : isOptional
+                            ? 'Select end date (optional)'
+                            : 'Select start date',
+                    style: TextStyle(
+                      color: value != null
+                          ? const Color(0xFF212121)
+                          : const Color(0xFF9E9E9E),
+                      fontSize: 14,
+                      fontWeight: value != null ? FontWeight.w500 : FontWeight.normal,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_drop_down,
+                  color: const Color(0xFF757575),
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

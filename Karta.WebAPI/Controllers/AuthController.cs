@@ -96,6 +96,14 @@ namespace Karta.WebAPI.Controllers
                 return BadRequest(new { message = "Invalid client type. Must be 'karta_desktop' or 'karta_mobile'." });
             }
 
+            // Provjeri da li korisnik sa tim emailom već postoji (case-insensitive)
+            var existingUser = await _userManager.FindByEmailAsync(request.Email);
+            if (existingUser != null)
+            {
+                _logger.LogWarning("Attempt to register user with existing email: {Email}", request.Email);
+                return BadRequest(new { message = "Korisnik sa ovom email adresom već postoji" });
+            }
+
             var user = new ApplicationUser
             {
                 UserName = request.Email,
@@ -463,6 +471,136 @@ namespace Karta.WebAPI.Controllers
                 _logger.LogError(ex, "Error processing forgot password request for {Email}", request.Email);
                 return StatusCode(500, new { message = "An error occurred while processing your request." });
             }
+        }
+
+        /// <summary>
+        /// Vraća vlastiti profil (trenutno ulogovanog korisnika)
+        /// </summary>
+        /// <returns>Podaci trenutno ulogovanog korisnika</returns>
+        /// <response code="200">Profil uspješno vraćen</response>
+        /// <response code="401">Neautorizovan pristup</response>
+        /// <response code="404">Korisnik nije pronađen</response>
+        [HttpGet("profile")]
+        [Authorize]
+        [SwaggerOperation(
+            Summary = "Vraća vlastiti profil",
+            Description = "Vraća informacije o trenutno ulogovanom korisniku"
+        )]
+        [SwaggerResponse(200, "Profil uspješno vraćen", typeof(UserDetailResponse))]
+        [SwaggerResponse(401, "Neautorizovan pristup")]
+        [SwaggerResponse(404, "Korisnik nije pronađen")]
+        public async Task<IActionResult> GetProfile()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(new { message = "Neautorizovan pristup" });
+            }
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                _logger.LogWarning("User not found for profile retrieval: {UserId}", userId);
+                return NotFound(new { message = "Korisnik nije pronađen" });
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+
+            var response = new UserDetailResponse(
+                Id: user.Id,
+                Email: user.Email ?? string.Empty,
+                FirstName: user.FirstName ?? string.Empty,
+                LastName: user.LastName ?? string.Empty,
+                EmailConfirmed: user.EmailConfirmed,
+                CreatedAt: user.CreatedAt,
+                LastLoginAt: user.LastLoginAt,
+                Roles: roles.ToArray()
+            );
+
+            _logger.LogInformation("Profile retrieved successfully for user {UserId}", userId);
+
+            return Ok(response);
+        }
+
+        /// <summary>
+        /// Ažurira vlastiti profil
+        /// </summary>
+        /// <returns>Ažurirani podaci korisnika</returns>
+        /// <response code="200">Profil uspješno ažuriran</response>
+        /// <response code="400">Neispravni podaci</response>
+        /// <response code="401">Neautorizovan pristup</response>
+        [HttpPut("profile")]
+        [Authorize]
+        [SwaggerOperation(
+            Summary = "Ažurira vlastiti profil",
+            Description = "Omogućava korisniku da ažurira svoje osnovne informacije (ime, prezime). Email se ne može mijenjati."
+        )]
+        [SwaggerResponse(200, "Profil uspješno ažuriran", typeof(AuthResponse))]
+        [SwaggerResponse(400, "Neispravni podaci")]
+        [SwaggerResponse(401, "Neautorizovan pristup")]
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateUserRequest request)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(new { message = "Neautorizovan pristup" });
+            }
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                _logger.LogWarning("User not found for profile update: {UserId}", userId);
+                return NotFound(new { message = "Korisnik nije pronađen" });
+            }
+
+            // Email se nikada ne može mijenjati - ignoriraj ako je poslan u requestu
+            if (!string.IsNullOrEmpty(request.Email) && request.Email != user.Email)
+            {
+                _logger.LogWarning("Attempt to change email for user {UserId} was ignored. Email cannot be changed.", userId);
+            }
+
+            // Ažuriraj polja koja su navedena
+            if (!string.IsNullOrEmpty(request.FirstName))
+            {
+                user.FirstName = request.FirstName;
+            }
+
+            if (!string.IsNullOrEmpty(request.LastName))
+            {
+                user.LastName = request.LastName;
+            }
+
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                _logger.LogError("Failed to update profile for user {UserId}: {Errors}", 
+                    userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+                return BadRequest(new { message = "Greška pri ažuriranju profila", errors = result.Errors });
+            }
+
+            _logger.LogInformation("Profile updated successfully for user {UserId}", userId);
+
+            // Generiši nove tokene sa ažuriranim podacima
+            var accessToken = await _jwtService.GenerateAccessTokenAsync(user);
+            var refreshToken = await _jwtService.GenerateRefreshTokenAsync();
+            await _jwtService.StoreRefreshTokenAsync(user.Id, refreshToken);
+
+            var roles = await _userManager.GetRolesAsync(user);
+            var response = new AuthResponse(
+                accessToken,
+                refreshToken,
+                DateTime.UtcNow.AddMinutes(60),
+                new UserInfo(
+                    user.Id,
+                    user.Email!,
+                    user.FirstName ?? "",
+                    user.LastName ?? "",
+                    user.EmailConfirmed,
+                    roles.ToArray()
+                )
+            );
+
+            return Ok(response);
         }
 
         [HttpPost("reset-password")]

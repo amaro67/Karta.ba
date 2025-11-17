@@ -28,12 +28,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   @override
   void dispose() {
-    // Clear event when leaving screen
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<EventProvider>().clearCurrentEvent();
-      }
-    });
+    // Clear event when leaving screen - do it directly, not in post frame callback
+    // because widget might be disposed by then
+    if (mounted) {
+      final eventProvider = context.read<EventProvider>();
+      eventProvider.clearCurrentEvent();
+    }
     super.dispose();
   }
 
@@ -42,49 +42,49 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Event Details'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
         actions: [
-          Consumer<EventProvider>(
-            builder: (context, eventProvider, child) {
-              final event = eventProvider.currentEvent;
+          Selector<EventProvider, EventDto?>(
+            selector: (_, provider) => provider.currentEvent,
+            builder: (context, event, child) {
               if (event == null) return const SizedBox.shrink();
 
-              return Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.edit),
-                    tooltip: 'Edit Event',
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => EventFormScreen(event: event),
-                        ),
-                      ).then((_) {
-                        eventProvider.loadEvent(widget.eventId);
-                      });
-                    },
-                  ),
-                  PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'delete') {
-                        _handleDelete(event);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, size: 20, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Delete', style: TextStyle(color: Colors.red)),
-                          ],
-                        ),
-                      ),
-                    ],
+              return IconButton(
+                icon: const Icon(Icons.edit),
+                tooltip: 'Edit Event',
+                onPressed: () {
+                  final eventProvider = context.read<EventProvider>();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => EventFormScreen(event: event),
+                    ),
+                  ).then((_) {
+                    eventProvider.loadEvent(widget.eventId);
+                  });
+                },
+              );
+            },
+          ),
+          Selector<EventProvider, EventDto?>(
+            selector: (_, provider) => provider.currentEvent,
+            builder: (context, event, child) {
+              if (event == null) return const SizedBox.shrink();
+
+              return PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'delete') {
+                    _handleDelete(event);
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 20, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
                   ),
                 ],
               );
@@ -183,257 +183,274 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           }
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Cover image
-                if (event.coverImageUrl != null && event.coverImageUrl!.isNotEmpty)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      event.coverImageUrl!,
-                      width: double.infinity,
-                      height: 200,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Container(
-                          height: 200,
-                          color: Theme.of(context).colorScheme.surfaceVariant,
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              value: loadingProgress.expectedTotalBytes != null
-                                  ? loadingProgress.cumulativeBytesLoaded /
-                                      loadingProgress.expectedTotalBytes!
-                                  : null,
-                            ),
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        height: 200,
-                        width: double.infinity,
-                        color: Theme.of(context).colorScheme.surfaceVariant,
-                        child: Icon(
-                          Icons.image_not_supported,
-                          size: 64,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 16),
-                // Title
-                Text(
-                  event.title,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                // Status and category chips
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _StatusChip(status: event.status),
-                    Chip(
-                      label: Text(event.category),
-                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                      labelStyle: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // Location
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Location',
-                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                    ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${event.venue}, ${event.city}, ${event.country}',
-                                style: Theme.of(context).textTheme.bodyLarge,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Date and time
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_today,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Date & Time',
-                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                    ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Starts: ${DateFormat('MMM dd, yyyy HH:mm').format(event.startsAt)}',
-                                style: Theme.of(context).textTheme.bodyLarge,
-                              ),
-                              if (event.endsAt != null) ...[
-                                const SizedBox(height: 4),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Top section: Content left, Image right
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Content - left side
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Title
                                 Text(
-                                  'Ends: ${DateFormat('MMM dd, yyyy HH:mm').format(event.endsAt!)}',
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  event.title,
+                                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF212121),
                                       ),
                                 ),
+                                const SizedBox(height: 12),
+                                // Status and category chips
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    _StatusChip(status: event.status),
+                                    Chip(
+                                      label: Text(event.category),
+                                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                                      labelStyle: TextStyle(
+                                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 20),
+                                // Info cards
+                                _InfoCard(
+                                  icon: Icons.location_on,
+                                  label: 'Location',
+                                  value: '${event.venue}\n${event.city}, ${event.country}',
+                                ),
+                                const SizedBox(height: 12),
+                                _InfoCard(
+                                  icon: Icons.calendar_today,
+                                  label: 'Date & Time',
+                                  value: '${DateFormat('MMM dd, yyyy').format(event.startsAt)}\n${DateFormat('HH:mm').format(event.startsAt)}',
+                                ),
+                                const SizedBox(height: 12),
+                                // Description
+                                if (event.description != null && event.description!.isNotEmpty)
+                                  _InfoCard(
+                                    icon: Icons.description,
+                                    label: 'Description',
+                                    value: event.description!,
+                                  ),
+                                // Tags
+                                if (event.tagList.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  _InfoCard(
+                                    icon: Icons.tag,
+                                    label: 'Tags',
+                                    value: event.tagList.join(', '),
+                                  ),
+                                ],
                               ],
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+                          // Cover image - right side
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: event.coverImageUrl != null && event.coverImageUrl!.isNotEmpty
+                                  ? Image.network(
+                                      event.coverImageUrl!,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                      loadingBuilder: (context, child, loadingProgress) {
+                                        if (loadingProgress == null) return child;
+                                        return Container(
+                                          width: double.infinity,
+                                          height: 400,
+                                          color: const Color(0xFFE0E0E0),
+                                          child: Center(
+                                            child: CircularProgressIndicator(
+                                              value: loadingProgress.expectedTotalBytes != null
+                                                  ? loadingProgress.cumulativeBytesLoaded /
+                                                      loadingProgress.expectedTotalBytes!
+                                                  : null,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      errorBuilder: (context, error, stackTrace) => Container(
+                                        width: double.infinity,
+                                        height: 400,
+                                        color: const Color(0xFFE0E0E0),
+                                        child: const Icon(
+                                          Icons.event,
+                                          size: 60,
+                                          color: Color(0xFF9E9E9E),
+                                        ),
+                                      ),
+                                    )
+                                  : Container(
+                                      width: double.infinity,
+                                      height: 400,
+                                      color: const Color(0xFFE0E0E0),
+                                      child: const Icon(
+                                        Icons.event,
+                                        size: 60,
+                                        color: Color(0xFF9E9E9E),
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Price tiers and Statistics side by side
+                      if (event.priceTiers.isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Price tiers - half width
+                              Expanded(
+                                child: _SectionCard(
+                                  title: 'Price Tiers',
+                                  child: Column(
+                                    children: event.priceTiers.map((tier) {
+                                      return Container(
+                                        margin: EdgeInsets.only(
+                                          bottom: event.priceTiers.last == tier ? 0 : 16,
+                                        ),
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF5F5F5),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: const Color(0xFFE0E0E0),
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        tier.name,
+                                                        style: Theme.of(context)
+                                                            .textTheme
+                                                            .titleMedium
+                                                            ?.copyWith(
+                                                              fontWeight: FontWeight.bold,
+                                                              color: const Color(0xFF212121),
+                                                            ),
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        '${tier.price.toStringAsFixed(2)} ${tier.currency}',
+                                                        style: Theme.of(context)
+                                                            .textTheme
+                                                            .bodyLarge
+                                                            ?.copyWith(
+                                                              fontWeight: FontWeight.w600,
+                                                              color: const Color(0xFF212121),
+                                                            ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 6,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: tier.available > 0
+                                                        ? Colors.green.withOpacity(0.1)
+                                                        : Colors.red.withOpacity(0.1),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    '${tier.available}/${tier.capacity}',
+                                                    style: TextStyle(
+                                                      color: tier.available > 0
+                                                          ? Colors.green
+                                                          : Colors.red,
+                                                      fontWeight: FontWeight.w600,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 12),
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(4),
+                                              child: LinearProgressIndicator(
+                                                value: (tier.soldPercentage / 100).clamp(0.0, 1.0),
+                                                minHeight: 8,
+                                                backgroundColor: Colors.grey[300],
+                                                valueColor: AlwaysStoppedAnimation<Color>(
+                                                  tier.soldPercentage > 80
+                                                      ? Colors.red
+                                                      : tier.soldPercentage > 50
+                                                          ? Colors.orange
+                                                          : Colors.green,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              // Statistics - half width
+                              Expanded(
+                                child: _SectionCard(
+                                  title: 'Statistics',
+                                  child: Column(
+                                    children: [
+                                      _StatItem(
+                                        label: 'Total Capacity',
+                                        value: event.totalCapacity.toString(),
+                                        icon: Icons.event_seat,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _StatItem(
+                                        label: 'Total Sold',
+                                        value: event.totalSold.toString(),
+                                        icon: Icons.shopping_cart,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _StatItem(
+                                        label: 'Available',
+                                        value: event.totalAvailable.toString(),
+                                        icon: Icons.check_circle,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                // Description
-                if (event.description != null && event.description!.isNotEmpty) ...[
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Description',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            event.description!,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                // Tags
-                if (event.tagList.isNotEmpty) ...[
-                  Text(
-                    'Tags',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: event.tagList
-                        .map((tag) => Chip(
-                              label: Text(tag),
-                              backgroundColor:
-                                  Theme.of(context).colorScheme.secondaryContainer,
-                              labelStyle: TextStyle(
-                                color: Theme.of(context).colorScheme.onSecondaryContainer,
-                              ),
-                            ))
-                        .toList(),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                // Price tiers
-                if (event.priceTiers.isNotEmpty) ...[
-                  Text(
-                    'Price Tiers',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  ...event.priceTiers.map((tier) => Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          title: Text(tier.name),
-                          subtitle: Text(
-                            '${tier.price} ${tier.currency} • ${tier.available}/${tier.capacity} available',
-                          ),
-                          trailing: LinearProgressIndicator(
-                            value: tier.soldPercentage / 100,
-                            backgroundColor: Colors.grey[300],
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              tier.soldPercentage > 80
-                                  ? Colors.red
-                                  : tier.soldPercentage > 50
-                                      ? Colors.orange
-                                      : Colors.green,
-                            ),
-                          ),
-                        ),
-                      )),
-                  const SizedBox(height: 16),
-                  // Statistics
-                  Card(
-                    color: Theme.of(context).colorScheme.surfaceVariant,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Statistics',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text('Total Capacity: ${event.totalCapacity}'),
-                          Text('Total Sold: ${event.totalSold}'),
-                          Text('Available: ${event.totalAvailable}'),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+              ),
             ),
           );
         },
@@ -517,7 +534,181 @@ class _StatusChip extends StatelessWidget {
     return Chip(
       label: Text(status),
       backgroundColor: backgroundColor,
-      labelStyle: TextStyle(color: textColor),
+      labelStyle: TextStyle(color: textColor, fontSize: 12),
+      side: BorderSide.none,
+    );
+  }
+}
+
+class _InfoCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _InfoCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFE0E0E0),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: const Color(0xFF212121),
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: const Color(0xFF757575),
+                        fontSize: 11,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF212121),
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const _SectionCard({
+    required this.title,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFE0E0E0),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF212121),
+                ),
+          ),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _StatItem extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _StatItem({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFFE0E0E0),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: const Color(0xFF212121),
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF212121),
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF757575),
+                        fontSize: 12,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

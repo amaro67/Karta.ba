@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -19,11 +20,13 @@ class _TicketListScreenState extends State<TicketListScreen> {
   String? _selectedStatus;
   DateTime? _fromDate;
   DateTime? _toDate;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _searchController.addListener(_onSearchChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TicketProvider>().loadTickets();
     });
@@ -31,9 +34,18 @@ class _TicketListScreenState extends State<TicketListScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+      _handleSearch();
+    });
   }
 
   void _onScroll() {
@@ -88,49 +100,61 @@ class _TicketListScreenState extends State<TicketListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Ticket Management'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: _handleFilter,
-            tooltip: 'Filter Tickets',
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => context.read<TicketProvider>().refreshTickets(),
-            tooltip: 'Refresh Tickets',
-          ),
-        ],
-      ),
       body: Column(
         children: [
-          // Search bar
+          // Search bar and actions
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: StatefulBuilder(
-              builder: (context, setState) => TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search by Ticket Code...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() {});
-                            _handleSearch();
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: StatefulBuilder(
+                    builder: (context, setState) => TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search by Ticket Code...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() {});
+                                  _handleSearch();
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
                   ),
                 ),
-                onChanged: (_) => setState(() {}),
-                onSubmitted: (_) => _handleSearch(),
-              ),
+                const SizedBox(width: 12),
+                IconButton(
+                  icon: const Icon(Icons.filter_list),
+                  onPressed: _handleFilter,
+                  tooltip: 'Filter Tickets',
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFF5F5F5),
+                    foregroundColor: const Color(0xFF212121),
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () => context.read<TicketProvider>().refreshTickets(),
+                  tooltip: 'Refresh Tickets',
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFF5F5F5),
+                    foregroundColor: const Color(0xFF212121),
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ],
             ),
           ),
           // Tickets list
@@ -163,24 +187,50 @@ class _TicketListScreenState extends State<TicketListScreen> {
 
                 final tickets = ticketProvider.tickets?.items ?? [];
                 if (tickets.isEmpty) {
-                  return const Center(
-                    child: Text('No tickets found.'),
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.confirmation_number_outlined,
+                          size: 64,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No tickets found',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ],
+                    ),
                   );
                 }
 
-                return ListView.builder(
-                  controller: _scrollController,
-                  itemCount: tickets.length + (ticketProvider.isLoading ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == tickets.length) {
-                      return const LoadingWidget(message: 'Loading more tickets...');
-                    }
-                    final ticket = tickets[index];
-                    return _TicketCard(
-                      ticket: ticket,
-                      onTap: () => _handleTicketTap(ticket),
-                    );
-                  },
+                return RefreshIndicator(
+                  onRefresh: () => ticketProvider.refreshTickets(),
+                  child: GridView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 4,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 3.0,
+                    ),
+                    itemCount: tickets.length + (ticketProvider.isLoading ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == tickets.length) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
+                      }
+                      final ticket = tickets[index];
+                      return _TicketCard(
+                        ticket: ticket,
+                        onTap: () => _handleTicketTap(ticket),
+                      );
+                    },
+                  ),
                 );
               },
             ),
@@ -219,50 +269,118 @@ class _TicketCard extends StatelessWidget {
         statusIcon = Icons.info_outline;
     }
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Icon(statusIcon, color: statusColor, size: 28),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      ticket.ticketCode,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Status: ${ticket.status}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: statusColor,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Issued: ${DateFormat('dd/MM/yyyy HH:mm').format(ticket.issuedAt)}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    if (ticket.usedAt != null)
-                      Text(
-                        'Used: ${DateFormat('dd/MM/yyyy HH:mm').format(ticket.usedAt!)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            ],
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFFE0E0E0),
+            width: 1,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                statusIcon,
+                color: statusColor,
+                size: 16,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    ticket.ticketCode,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF212121),
+                          fontSize: 13,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          ticket.status,
+                          style: TextStyle(
+                            color: statusColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          DateFormat('dd/MM/yyyy').format(ticket.issuedAt),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: const Color(0xFF757575),
+                                fontSize: 10,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (ticket.usedAt != null) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          size: 10,
+                          color: Colors.green,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'Used: ${DateFormat('dd/MM/yyyy').format(ticket.usedAt!)}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Colors.green.shade700,
+                                  fontSize: 10,
+                                ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

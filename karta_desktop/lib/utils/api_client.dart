@@ -31,6 +31,24 @@ class ApiClient {
     return headers;
   }
 
+  // Helper method to extract user-friendly error message from API response
+  static String _extractErrorMessage(dynamic errorData) {
+    if (errorData is Map) {
+      // Check for nested error object (ApiErrorResponse structure)
+      if (errorData.containsKey('error') && errorData['error'] is Map) {
+        final error = errorData['error'] as Map;
+        if (error.containsKey('message')) {
+          return error['message'] as String;
+        }
+      }
+      // Check for direct message field
+      if (errorData.containsKey('message')) {
+        return errorData['message'] as String;
+      }
+    }
+    return 'An error occurred. Please try again.';
+  }
+
   // Authentication endpoints
   static Future<AuthResponse> login(LoginRequest request) async {
     try {
@@ -50,21 +68,29 @@ class ApiClient {
         final jsonData = jsonDecode(response.body);
         return AuthResponse.fromJson(jsonData);
       } else {
-        String errorMessage = 'Login failed';
+        String errorMessage = 'Neispravna email adresa ili lozinka';
         try {
-          final errorData = jsonDecode(response.body);
-          errorMessage = errorData['message'] ?? errorData.toString();
+          if (response.body.isNotEmpty) {
+            final errorData = jsonDecode(response.body);
+            errorMessage = _extractErrorMessage(errorData);
+          }
         } catch (e) {
-          errorMessage = response.body.isNotEmpty ? response.body : 'Login failed with status ${response.statusCode}';
+          // If JSON parsing fails, use default message
+          errorMessage = 'Neispravna email adresa ili lozinka';
         }
         throw Exception(errorMessage);
       }
     } catch (e) {
       print('🔴 Login error: $e');
       if (e is SocketException || e.toString().contains('Failed host lookup')) {
-        throw Exception('Unable to connect to server. Please check your connection.');
+        throw Exception('Nema konekcije sa serverom. Provjerite vašu internet konekciju.');
       }
-      rethrow;
+      // If it's already an Exception with a clean message, rethrow it
+      if (e is Exception) {
+        rethrow;
+      }
+      // Otherwise, wrap it with a clean message
+      throw Exception('Neispravna email adresa ili lozinka');
     }
   }
 
@@ -179,6 +205,108 @@ class ApiClient {
         throw Exception('Unable to connect to server. Please check your connection.');
       }
       rethrow;
+    }
+  }
+
+  // Update own profile
+  static Future<AuthResponse> updateProfile(String token, String firstName, String lastName) async {
+    print('🔵 ApiClient.updateProfile: firstName="$firstName", lastName="$lastName"');
+    try {
+      final userData = <String, dynamic>{};
+      if (firstName.isNotEmpty) {
+        userData['firstName'] = firstName;
+      }
+      if (lastName.isNotEmpty) {
+        userData['lastName'] = lastName;
+      }
+
+      print('🔵 ApiClient.updateProfile: Request body: ${jsonEncode(userData)}');
+
+      final response = await _client.put(
+        Uri.parse('$baseUrl$apiPrefix/Auth/profile'),
+        headers: _getHeaders(token: token),
+        body: jsonEncode(userData),
+      );
+
+      print('🔵 ApiClient.updateProfile: Response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final jsonData = jsonDecode(response.body);
+        print('🔵 ApiClient.updateProfile: Response user: ${jsonData['user']['firstName']} ${jsonData['user']['lastName']}');
+        final authResponse = AuthResponse.fromJson(jsonData);
+        print('✅ ApiClient.updateProfile: Success - User: ${authResponse.user.firstName} ${authResponse.user.lastName}');
+        return authResponse;
+      } else {
+        String errorMessage = 'Greška pri ažuriranju profila';
+        try {
+          if (response.body.isNotEmpty) {
+            final errorData = jsonDecode(response.body);
+            errorMessage = _extractErrorMessage(errorData);
+          }
+        } catch (e) {
+          errorMessage = 'Greška pri ažuriranju profila';
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      if (e is SocketException || e.toString().contains('Failed host lookup')) {
+        throw Exception('Nema konekcije sa serverom. Provjerite vašu internet konekciju.');
+      }
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('Greška pri ažuriranju profila');
+    }
+  }
+
+  // Get current user profile from server
+  static Future<Map<String, dynamic>> getMyProfile(String token) async {
+    print('🔵 ApiClient.getMyProfile: Fetching profile from server...');
+    try {
+      final response = await _client.get(
+        Uri.parse('$baseUrl$apiPrefix/Auth/profile'),
+        headers: _getHeaders(token: token),
+      );
+
+      print('🔵 ApiClient.getMyProfile: Response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final jsonData = jsonDecode(response.body);
+        print('🔵 ApiClient.getMyProfile: Raw response: $jsonData');
+        
+        // Backend vraća UserDetailResponse sa Pascal Case
+        // Konvertuj u camelCase za Flutter
+        final result = {
+          'id': jsonData['Id'] ?? jsonData['id'],
+          'email': jsonData['Email'] ?? jsonData['email'],
+          'firstName': jsonData['FirstName'] ?? jsonData['firstName'],
+          'lastName': jsonData['LastName'] ?? jsonData['lastName'],
+          'emailConfirmed': jsonData['EmailConfirmed'] ?? jsonData['emailConfirmed'],
+          'roles': jsonData['Roles'] ?? jsonData['roles'],
+        };
+        
+        print('✅ ApiClient.getMyProfile: Success - User: ${result['firstName']} ${result['lastName']}');
+        return result;
+      } else {
+        String errorMessage = 'Greška pri učitavanju profila';
+        try {
+          if (response.body.isNotEmpty) {
+            final errorData = jsonDecode(response.body);
+            errorMessage = _extractErrorMessage(errorData);
+          }
+        } catch (e) {
+          errorMessage = 'Greška pri učitavanju profila';
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      if (e is SocketException || e.toString().contains('Failed host lookup')) {
+        throw Exception('Nema konekcije sa serverom. Provjerite vašu internet konekciju.');
+      }
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('Greška pri učitavanju profila');
     }
   }
 
@@ -539,12 +667,44 @@ class ApiClient {
     }
   }
 
-  /// Assign role to user
+  /// Assign role to user (replaces all existing roles with new one)
   static Future<Map<String, dynamic>> assignRole(String token, String userId, String roleName) async {
     return await post('/CoreRole/assign', {
       'userId': userId,
       'roleName': roleName,
     }, token: token);
+  }
+
+  /// Add role to user (allows multiple roles)
+  static Future<Map<String, dynamic>> addUserToRole(String token, String userId, String roleName) async {
+    return await post('/Role/users', {
+      'userId': userId,
+      'roleName': roleName,
+    }, token: token);
+  }
+
+  /// Remove role from user
+  static Future<void> removeUserFromRole(String token, String userId, String roleName) async {
+    try {
+      final response = await _client.delete(
+        Uri.parse('$baseUrl$apiPrefix/Role/users'),
+        headers: _getHeaders(token: token),
+        body: jsonEncode({
+          'userId': userId,
+          'roleName': roleName,
+        }),
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        final errorData = jsonDecode(response.body);
+        throw Exception(errorData['message'] ?? 'Remove role failed');
+      }
+    } catch (e) {
+      if (e is SocketException) {
+        throw Exception('Unable to connect to server. Please check your connection.');
+      }
+      rethrow;
+    }
   }
 
   // ==================== Event Management Endpoints ====================
@@ -642,6 +802,40 @@ class ApiClient {
   /// Get order by ID (for admin - no ownership required)
   static Future<Map<String, dynamic>> getOrderAdmin(String token, String orderId) async {
     return await get('/Order/admin/$orderId', token: token);
+  }
+
+  /// Get my orders (for logged-in user)
+  static Future<List<dynamic>> getMyOrders(String token) async {
+    try {
+      final response = await _client.get(
+        Uri.parse('$baseUrl$apiPrefix/Order/my-orders'),
+        headers: _getHeaders(token: token),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is List) {
+          return List<dynamic>.from(data);
+        }
+        return [];
+      } else {
+        String errorMessage = 'Failed to load orders';
+        try {
+          if (response.body.isNotEmpty) {
+            final errorData = jsonDecode(response.body);
+            errorMessage = errorData['message'] ?? errorMessage;
+          }
+        } catch (_) {
+          // Ignore JSON parsing errors for error response
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      if (e is SocketException) {
+        throw Exception('Unable to connect to server. Please check your connection.');
+      }
+      rethrow;
+    }
   }
 
   // ==================== Ticket Management Endpoints ====================

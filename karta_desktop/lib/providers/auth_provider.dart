@@ -23,6 +23,7 @@ class AuthProvider extends ChangeNotifier {
   String? _refreshToken;
   bool _isLoading = false;
   String? _error;
+  int _userUpdateCounter = 0; // Counter to track user updates
 
   // Getters
   UserInfo? get currentUser => _currentUser;
@@ -31,6 +32,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isAuthenticated => _currentUser != null && _accessToken != null;
+  int get userUpdateCounter => _userUpdateCounter; // For forcing UI rebuilds
 
   // Initialize auth state from storage
   Future<void> initialize() async {
@@ -118,6 +120,19 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // Helper method to extract clean error message from exception
+  String _extractErrorMessage(dynamic error) {
+    if (error is Exception) {
+      final errorString = error.toString();
+      // Remove "Exception: " prefix if present
+      if (errorString.startsWith('Exception: ')) {
+        return errorString.substring(11);
+      }
+      return errorString;
+    }
+    return error.toString();
+  }
+
   // Login
   Future<bool> login(String email, String password, {bool rememberMe = false}) async {
     _setLoading(true);
@@ -134,7 +149,7 @@ class AuthProvider extends ChangeNotifier {
       await _saveAuthData(response);
       return true;
     } catch (e) {
-      _setError(e.toString());
+      _setError(_extractErrorMessage(e));
       return false;
     } finally {
       _setLoading(false);
@@ -196,7 +211,68 @@ class AuthProvider extends ChangeNotifier {
       await ApiClient.resetPassword(token, newPassword);
       return true;
     } catch (e) {
-      _setError(e.toString());
+      _setError(_extractErrorMessage(e));
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // Refresh current user from server
+  Future<bool> refreshCurrentUser() async {
+    print('🔵 AuthProvider.refreshCurrentUser: Refreshing user from server...');
+    if (_accessToken == null) {
+      print('🔴 AuthProvider.refreshCurrentUser: No access token');
+      return false;
+    }
+
+    try {
+      final userData = await ApiClient.getMyProfile(_accessToken!);
+      
+      // Update current user with fresh data from server
+      _currentUser = UserInfo(
+        id: userData['id'] as String,
+        email: userData['email'] as String,
+        firstName: userData['firstName'] as String? ?? '',
+        lastName: userData['lastName'] as String? ?? '',
+        emailConfirmed: userData['emailConfirmed'] as bool? ?? false,
+        roles: (userData['roles'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
+      );
+      
+      // Increment counter to force UI rebuild
+      _userUpdateCounter++;
+      
+      print('✅ AuthProvider.refreshCurrentUser: Success - User: ${_currentUser?.firstName} ${_currentUser?.lastName}, Counter: $_userUpdateCounter');
+      notifyListeners();
+      return true;
+    } catch (e) {
+      print('🔴 AuthProvider.refreshCurrentUser: Error: $e');
+      return false;
+    }
+  }
+
+  // Update profile
+  Future<bool> updateProfile(String firstName, String lastName) async {
+    print('🔵 AuthProvider.updateProfile: firstName="$firstName", lastName="$lastName"');
+    if (_accessToken == null) {
+      _setError('Niste prijavljeni');
+      print('🔴 AuthProvider.updateProfile: No access token');
+      return false;
+    }
+
+    _setLoading(true);
+    _clearError();
+    
+    try {
+      print('🔵 AuthProvider.updateProfile: Calling ApiClient...');
+      final response = await ApiClient.updateProfile(_accessToken!, firstName, lastName);
+      print('🔵 AuthProvider.updateProfile: Got response, saving auth data...');
+      await _saveAuthData(response);
+      print('✅ AuthProvider.updateProfile: Success - Current user: ${_currentUser?.firstName} ${_currentUser?.lastName}');
+      return true;
+    } catch (e) {
+      print('🔴 AuthProvider.updateProfile: Error: $e');
+      _setError(_extractErrorMessage(e));
       return false;
     } finally {
       _setLoading(false);
@@ -224,10 +300,12 @@ class AuthProvider extends ChangeNotifier {
 
   // Save authentication data
   Future<void> _saveAuthData(AuthResponse response) async {
-    print('🔵 AuthProvider: Saving auth data...');
+    print('🔵 AuthProvider._saveAuthData: Saving auth data...');
+    print('🔵 AuthProvider._saveAuthData: User from response: ${response.user.firstName} ${response.user.lastName}');
     _accessToken = response.accessToken;
     _refreshToken = response.refreshToken;
     _currentUser = response.user;
+    print('🔵 AuthProvider._saveAuthData: _currentUser set to: ${_currentUser?.firstName} ${_currentUser?.lastName}');
     
     print('🔵 AuthProvider: Writing tokens to storage... (Platform: ${_isWeb ? "Web" : "Desktop/Mobile"})');
     
@@ -268,7 +346,9 @@ class AuthProvider extends ChangeNotifier {
       }
     }
     
+    print('🔵 AuthProvider._saveAuthData: Calling notifyListeners()...');
     notifyListeners();
+    print('✅ AuthProvider._saveAuthData: Complete');
   }
 
   // Clear authentication data

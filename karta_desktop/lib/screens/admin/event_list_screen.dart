@@ -139,51 +139,72 @@ class _EventListScreenState extends State<EventListScreen> {
     final canCreateEvents = authProvider.isAdmin || authProvider.isOrganizer;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Event Management'),
-        actions: [
-          if (canCreateEvents)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: _handleCreateEvent,
-              tooltip: 'Create Event',
-            ),
-        ],
-      ),
       body: Column(
         children: [
           // Search and filter bar
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search events...',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                _handleSearch();
-                              },
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  child: StatefulBuilder(
+                    builder: (context, setState) => TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search events...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() {});
+                                  _handleSearch();
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
+                      onChanged: (_) => setState(() {}),
+                      onSubmitted: (_) => _handleSearch(),
                     ),
-                    onSubmitted: (_) => _handleSearch(),
                   ),
                 ),
+                const SizedBox(width: 12),
+                if (canCreateEvents)
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: _handleCreateEvent,
+                    tooltip: 'Create Event',
+                    style: IconButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.all(12),
+                    ),
+                  ),
                 const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.filter_list),
                   onPressed: _handleFilter,
-                  tooltip: 'Filter',
+                  tooltip: 'Filter Events',
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFF5F5F5),
+                    foregroundColor: const Color(0xFF212121),
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () => context.read<EventProvider>().refreshEvents(useAdminEndpoint: true),
+                  tooltip: 'Refresh Events',
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFF5F5F5),
+                    foregroundColor: const Color(0xFF212121),
+                    padding: const EdgeInsets.all(12),
+                  ),
                 ),
               ],
             ),
@@ -263,17 +284,20 @@ class _EventListScreenState extends State<EventListScreen> {
 
                 return RefreshIndicator(
                   onRefresh: () => eventProvider.refreshEvents(useAdminEndpoint: true),
-                  child: ListView.builder(
+                  child: GridView.builder(
                     controller: _scrollController,
-                    itemCount: events.length + (eventProvider.isLoading ? 1 : 0),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 0.75,
+                    ),
                     padding: const EdgeInsets.all(16),
+                    itemCount: events.length + (eventProvider.isLoading ? 1 : 0),
                     itemBuilder: (context, index) {
                       if (index == events.length) {
                         return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16),
-                            child: CircularProgressIndicator(),
-                          ),
+                          child: CircularProgressIndicator(),
                         );
                       }
 
@@ -324,114 +348,252 @@ class _EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: onTap,
+    final theme = Theme.of(context);
+    final dateFormat = '${event.startsAt.day}/${event.startsAt.month}/${event.startsAt.year}';
+    final timeFormat = '${event.startsAt.hour.toString().padLeft(2, '0')}:${event.startsAt.minute.toString().padLeft(2, '0')}';
+    
+    // Calculate lowest price
+    final lowestPrice = event.priceTiers.isNotEmpty
+        ? event.priceTiers.map((tier) => tier.price).reduce((a, b) => a < b ? a : b)
+        : 0.0;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F5), // Light grey background
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        border: Border.all(
+          color: const Color(0xFFE0E0E0),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Cover image or placeholder with actions
+          Stack(
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          event.title,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on,
-                              size: 16,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${event.venue}, ${event.city}',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ],
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+                child: event.coverImageUrl != null && event.coverImageUrl!.isNotEmpty
+                    ? Image.network(
+                        event.coverImageUrl!,
+                        height: 180,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => _ImagePlaceholder(),
+                      )
+                    : _ImagePlaceholder(),
+              ),
+              // Actions menu
+              if (onEdit != null || onDelete != null)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: PopupMenuButton<String>(
+                    icon: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.more_vert,
+                        size: 20,
+                        color: Color(0xFF212121),
+                      ),
                     ),
+                    onSelected: (value) {
+                      if (value == 'edit' && onEdit != null) {
+                        onEdit!();
+                      } else if (value == 'delete' && onDelete != null) {
+                        onDelete!();
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      if (onEdit != null)
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit, size: 20),
+                              SizedBox(width: 8),
+                              Text('Edit'),
+                            ],
+                          ),
+                        ),
+                      if (onDelete != null)
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, size: 20, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Delete', style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
-                  if (onEdit != null || onDelete != null)
-                    PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'edit' && onEdit != null) {
-                          onEdit!();
-                        } else if (value == 'delete' && onDelete != null) {
-                          onDelete!();
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        if (onEdit != null)
-                          const PopupMenuItem(
-                            value: 'edit',
-                            child: Row(
-                              children: [
-                                Icon(Icons.edit, size: 20),
-                                SizedBox(width: 8),
-                                Text('Edit'),
-                              ],
-                            ),
-                          ),
-                        if (onDelete != null)
-                          const PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete, size: 20, color: Colors.red),
-                                SizedBox(width: 8),
-                                Text('Delete', style: TextStyle(color: Colors.red)),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                ],
-              ),
-              if (event.description != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  event.description!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
-              ],
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _StatusChip(status: event.status),
-                  _CategoryChip(category: event.category),
-                  _DateChip(date: event.startsAt),
-                ],
-              ),
-              if (event.priceTiers.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  'Tickets: ${event.totalSold}/${event.totalCapacity} sold',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
             ],
           ),
-        ),
+          // Content
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title
+                  Text(
+                    event.title,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: const Color(0xFF212121),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  // Location
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          '${event.venue}, ${event.city}',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Date and time
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today,
+                        size: 16,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$dateFormat at $timeFormat',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Description
+                  if (event.description != null && event.description!.isNotEmpty) ...[
+                    Text(
+                      event.description!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontSize: 12,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  // Status and Category
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      _StatusChip(status: event.status),
+                      _CategoryChip(category: event.category),
+                    ],
+                  ),
+                  const Spacer(),
+                  // Tickets info
+                  if (event.priceTiers.isNotEmpty) ...[
+                    Text(
+                      '${event.totalSold}/${event.totalCapacity} tickets sold',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                  // Price
+                  if (lowestPrice > 0)
+                    Text(
+                      'From ${lowestPrice.toStringAsFixed(2)} ${event.priceTiers.first.currency}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF212121),
+                        fontSize: 14,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          // Button
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: onTap,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(
+                    color: Color(0xFF212121),
+                    width: 1,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: Text(
+                  'View Details',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF212121),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImagePlaceholder extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 180,
+      width: double.infinity,
+      color: const Color(0xFFE0E0E0),
+      child: const Icon(
+        Icons.event,
+        size: 64,
+        color: Color(0xFF9E9E9E),
       ),
     );
   }
@@ -490,34 +652,6 @@ class _CategoryChip extends StatelessWidget {
   }
 }
 
-class _DateChip extends StatelessWidget {
-  final DateTime date;
-
-  const _DateChip({required this.date});
-
-  @override
-  Widget build(BuildContext context) {
-    return Chip(
-      avatar: Icon(
-        Icons.calendar_today,
-        size: 16,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-      label: Text(
-        '${date.day}/${date.month}/${date.year}',
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-          fontSize: 12,
-        ),
-      ),
-      backgroundColor: Colors.transparent,
-      side: BorderSide(
-        color: Theme.of(context).colorScheme.outline,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-    );
-  }
-}
 
 class _FilterDialog extends StatefulWidget {
   final String? category;

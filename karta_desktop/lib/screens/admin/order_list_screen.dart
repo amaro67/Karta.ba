@@ -84,52 +84,69 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Order Management'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: _handleFilter,
-            tooltip: 'Filter Orders',
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => context.read<OrderProvider>().refreshOrders(),
-            tooltip: 'Refresh Orders',
-          ),
-        ],
-      ),
       body: Column(
         children: [
-          // Search bar
+          // Search bar and actions
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: StatefulBuilder(
-              builder: (context, setState) => TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search by Order ID, Name, Email...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() {});
-                            _handleSearch();
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: StatefulBuilder(
+                    builder: (context, setState) => TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search by Order ID, Name, Email...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() {});
+                                  _handleSearch();
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                      onSubmitted: (_) => _handleSearch(),
+                    ),
                   ),
                 ),
-                onChanged: (_) => setState(() {}),
-                onSubmitted: (_) => _handleSearch(),
-              ),
+                const SizedBox(width: 12),
+                IconButton(
+                  icon: const Icon(Icons.filter_list),
+                  onPressed: _handleFilter,
+                  tooltip: 'Filter Orders',
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFF5F5F5),
+                    foregroundColor: const Color(0xFF212121),
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () => context.read<OrderProvider>().refreshOrders(),
+                  tooltip: 'Refresh Orders',
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFF5F5F5),
+                    foregroundColor: const Color(0xFF212121),
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ],
             ),
           ),
           // Orders list
@@ -162,151 +179,189 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
           final orders = orderProvider.orders?.items ?? [];
           if (orders.isEmpty) {
-            return const Center(
-              child: Text('No orders found.'),
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.shopping_cart_outlined,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No orders found',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ],
+              ),
             );
           }
 
-                return RefreshIndicator(
-                  onRefresh: () => orderProvider.refreshOrders(),
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    itemCount: orders.length + (orderProvider.isLoading ? 1 : 0),
-                    padding: const EdgeInsets.all(16),
-                    itemBuilder: (context, index) {
-                      if (index == orders.length) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16),
-                            child: CircularProgressIndicator(),
+          return RefreshIndicator(
+            onRefresh: () => orderProvider.refreshOrders(),
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              scrollDirection: Axis.vertical,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: DataTable(
+                    headingRowHeight: 56,
+                    dataRowMinHeight: 64,
+                    dataRowMaxHeight: 80,
+                    columnSpacing: 20,
+                    showCheckboxColumn: false,
+                    headingRowColor: WidgetStateProperty.all(
+                      const Color(0xFFF5F5F5),
+                    ),
+                    columns: const [
+                          DataColumn(
+                            label: Text(
+                              'Order ID',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF212121),
+                              ),
+                            ),
                           ),
-                        );
-                      }
-
-                      final order = orders[index];
-                      return _OrderCard(
-                        order: order,
-                        onTap: () => _handleOrderTap(order),
-                      );
-                    },
+                          DataColumn(
+                            label: Text(
+                              'Customer',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF212121),
+                              ),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Text(
+                              'Date',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF212121),
+                              ),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Text(
+                              'Status',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF212121),
+                              ),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Text(
+                              'Items',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF212121),
+                              ),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Text(
+                              'Total',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF212121),
+                              ),
+                            ),
+                          ),
+                    ],
+                    rows: [
+                          ...orders.map((order) {
+                            return DataRow(
+                              onSelectChanged: (_) => _handleOrderTap(order),
+                              cells: [
+                                DataCell(
+                                  Text(
+                                    order.id.substring(0, 8),
+                                    style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        order.userDisplayName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      if (order.userEmail != null)
+                                        Text(
+                                          order.userEmail!,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    _formatDate(order.createdAt),
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                                DataCell(_StatusChip(status: order.status)),
+                                DataCell(
+                                  Text(
+                                    '${order.totalTickets} ticket(s)',
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    '${order.totalAmount.toStringAsFixed(2)} ${order.currency}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: Theme.of(context).colorScheme.primary,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }).toList(),
+                          if (orderProvider.isLoading)
+                            DataRow(
+                              cells: List.generate(
+                                6,
+                                (_) => const DataCell(
+                                  Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(16),
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                    ],
                   ),
-                );
+                ),
+              ),
+            ),
+          );
               },
             ),
           ),
         ],
       ),
     );
-  }
-}
-
-class _OrderCard extends StatelessWidget {
-  final OrderDto order;
-  final VoidCallback onTap;
-
-  const _OrderCard({
-    required this.order,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Order #${order.id.substring(0, 8)}',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 4),
-                        if (order.userEmail != null)
-                          Text(
-                            order.userDisplayName,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          )
-                        else
-                          Text(
-                            'User: ${order.userId.substring(0, 8)}...',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        if (order.userEmail != null)
-                          Text(
-                            order.userEmail!,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  _StatusChip(status: order.status),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(
-                    Icons.calendar_today,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _formatDate(order.createdAt),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(width: 16),
-                  Icon(
-                    Icons.shopping_cart,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${order.totalTickets} ticket(s)',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${order.items.length} item(s)',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  Text(
-                    '${order.totalAmount.toStringAsFixed(2)} ${order.currency}',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
 }
 
@@ -338,11 +393,38 @@ class _StatusChip extends StatelessWidget {
         color = Colors.grey;
     }
 
-    return Chip(
-      label: Text(status),
-      backgroundColor: color.withOpacity(0.1),
-      labelStyle: TextStyle(color: color, fontSize: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            status,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

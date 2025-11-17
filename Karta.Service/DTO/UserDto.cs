@@ -58,7 +58,7 @@ namespace Karta.Service.DTO
         string? LastName,
         
         /// <summary>
-        /// Email adresa korisnika
+        /// Email adresa korisnika (ignorira se - email se ne može mijenjati)
         /// </summary>
         [EmailAddress(ErrorMessage = "Neispravna email adresa")]
         string? Email,

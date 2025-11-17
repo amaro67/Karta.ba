@@ -6,7 +6,7 @@ import 'providers/event_provider.dart';
 import 'providers/order_provider.dart';
 import 'providers/ticket_provider.dart';
 import 'screens/auth/login_screen.dart';
-import 'screens/profile/profile_screen.dart';
+import 'screens/admin/user_detail_screen.dart';
 import 'widgets/admin_layout.dart';
 
 void main() {
@@ -23,7 +23,11 @@ class KartaDesktopApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProxyProvider<AuthProvider, AdminProvider>(
           create: (_) => AdminProvider(AuthProvider()),
-          update: (_, authProvider, __) => AdminProvider(authProvider),
+          update: (_, authProvider, adminProvider) {
+            adminProvider ??= AdminProvider(authProvider);
+            adminProvider.updateAuthProvider(authProvider);
+            return adminProvider;
+          },
         ),
         ChangeNotifierProxyProvider<AuthProvider, EventProvider>(
           create: (_) => EventProvider(AuthProvider()),
@@ -160,9 +164,14 @@ class _AppWrapperState extends State<AppWrapper> {
   }
 }
 
-class MainApp extends StatelessWidget {
+class MainApp extends StatefulWidget {
   const MainApp({super.key});
 
+  @override
+  State<MainApp> createState() => _MainAppState();
+}
+
+class _MainAppState extends State<MainApp> {
   @override
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
@@ -174,13 +183,32 @@ class MainApp extends StatelessWidget {
             title: Text('Karta Desktop - ${user.fullName}'),
             actions: [
               PopupMenuButton<String>(
-                onSelected: (value) {
+                key: ValueKey('user_profile_${authProvider.userUpdateCounter}'),
+                onSelected: (value) async {
                   if (value == 'profile') {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const ProfileScreen(),
-                      ),
-                    );
+                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    final user = authProvider.currentUser;
+                    if (user != null) {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => UserDetailScreen(
+                            isOwnProfile: true,
+                            user: {
+                              'id': user.id,
+                              'email': user.email,
+                              'firstName': user.firstName,
+                              'lastName': user.lastName,
+                              'emailConfirmed': user.emailConfirmed,
+                              'roles': user.roles,
+                            },
+                          ),
+                        ),
+                      );
+                      // Refresh user data from server after returning to ensure navbar is updated
+                      print('🔵 MainApp: Returned from profile, refreshing user data...');
+                      await authProvider.refreshCurrentUser();
+                      print('✅ MainApp: User data refreshed - ${authProvider.currentUser?.firstName} ${authProvider.currentUser?.lastName}');
+                    }
                   } else if (value == 'logout') {
                     authProvider.logout();
                   }
@@ -257,11 +285,25 @@ class MainApp extends StatelessWidget {
                 ],
                 ElevatedButton.icon(
                   onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const ProfileScreen(),
-                      ),
-                    );
+                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    final user = authProvider.currentUser;
+                    if (user != null) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => UserDetailScreen(
+                            isOwnProfile: true,
+                            user: {
+                              'id': user.id,
+                              'email': user.email,
+                              'firstName': user.firstName,
+                              'lastName': user.lastName,
+                              'emailConfirmed': user.emailConfirmed,
+                              'roles': user.roles,
+                            },
+                          ),
+                        ),
+                      );
+                    }
                   },
                   icon: const Icon(Icons.person),
                   label: const Text('My Profile'),

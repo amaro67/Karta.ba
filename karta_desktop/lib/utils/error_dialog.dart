@@ -31,17 +31,46 @@ class ErrorDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
       title: Row(
         children: [
-          Icon(
-            Icons.error_outline,
-            color: Theme.of(context).colorScheme.error,
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.error.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.error_outline,
+              color: Theme.of(context).colorScheme.error,
+              size: 24,
+            ),
           ),
-          const SizedBox(width: 8),
-          Text(title),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ),
         ],
       ),
-      content: Text(message),
+      content: Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          message,
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.grey.shade700,
+          ),
+        ),
+      ),
       actions: [
         if (onRetry != null)
           TextButton(
@@ -49,10 +78,17 @@ class ErrorDialog extends StatelessWidget {
               Navigator.of(context).pop();
               onRetry!();
             },
-            child: const Text('Retry'),
+            child: const Text('Pokušaj ponovo'),
           ),
-        TextButton(
+        ElevatedButton(
           onPressed: () => Navigator.of(context).pop(),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
           child: const Text('OK'),
         ),
       ],

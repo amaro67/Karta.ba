@@ -147,12 +147,14 @@ namespace Karta.Service.Services
 
             if (from.HasValue)
             {
-                ticketsQuery = ticketsQuery.Where(t => t.IssuedAt >= from.Value);
+                var fromDateTime = from.Value.UtcDateTime;
+                ticketsQuery = ticketsQuery.Where(t => t.IssuedAt >= fromDateTime);
             }
 
             if (to.HasValue)
             {
-                ticketsQuery = ticketsQuery.Where(t => t.IssuedAt <= to.Value);
+                var toDateTime = to.Value.UtcDateTime;
+                ticketsQuery = ticketsQuery.Where(t => t.IssuedAt <= toDateTime);
             }
 
             var total = await ticketsQuery.CountAsync(ct);

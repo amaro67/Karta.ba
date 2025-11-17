@@ -6,6 +6,7 @@ using Karta.WebAPI.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 
@@ -156,21 +157,46 @@ namespace Karta.WebAPI.Controllers
 
         [HttpPost("webhook")]
         [AllowAnonymous]
+        [DisableRateLimiting]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> HandleWebhook(CancellationToken ct = default)
         {
             try
             {
-                using var reader = new StreamReader(Request.Body);
+                _logger.LogInformation("Webhook received at {Time}", DateTime.UtcNow);
+                
+                // Enable buffering to allow reading the body multiple times
+                Request.EnableBuffering();
+                
+                // Reset position to beginning in case it was already read
+                Request.Body.Position = 0;
+                
+                using var reader = new StreamReader(Request.Body, leaveOpen: true);
                 var json = await reader.ReadToEndAsync();
+                
+                // Reset position again for potential future reads
+                Request.Body.Position = 0;
+                
                 var signature = Request.Headers["Stripe-Signature"].FirstOrDefault();
                 
+                _logger.LogInformation("Webhook payload length: {Length}, Signature present: {HasSignature}", 
+                    json.Length, !string.IsNullOrEmpty(signature));
+                
+                if (string.IsNullOrEmpty(json))
+                {
+                    _logger.LogWarning("Webhook payload is empty");
+                    return BadRequest("Webhook payload is empty");
+                }
+                
                 await _orderService.HandleStripeWebhookAsync(json, signature, ct);
+                
+                _logger.LogInformation("Webhook processed successfully");
                 return Ok();
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Webhook processing failed: {Message}", ex.Message);
                 return Problem(title: "Webhook processing failed", detail: ex.Message, statusCode: 400);
             }
         }
@@ -205,13 +231,16 @@ namespace Karta.WebAPI.Controllers
             try
             {
                 // For success page, we don't need user validation - just show order info
-                // We'll get the order with a dummy userId since it's public success page
-                var order = await _orderService.GetOrderAsync(Guid.Parse(order_id), "public", ct);
+                // Use GetOrderByIdAsync which doesn't require userId validation
+                var order = await _orderService.GetOrderByIdAsync(Guid.Parse(order_id), ct);
                 
                 if (order == null)
                 {
+                    _logger.LogWarning("Order not found for success page: {OrderId}", order_id);
                     return BadRequest("Order not found");
                 }
+
+                _logger.LogInformation("Payment success page accessed for order {OrderId}, status: {Status}", order.Id, order.Status);
 
                 return Ok(new
                 {

@@ -37,6 +37,11 @@ namespace Karta.Model
                     .IsRequired();
 
                 entity.Property(e => e.LastLoginAt);
+
+                // Ensure email is unique
+                entity.HasIndex(e => e.NormalizedEmail)
+                    .IsUnique()
+                    .HasDatabaseName("EmailIndex");
             });
 
             // Configure ApplicationRole properties

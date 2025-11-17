@@ -81,7 +81,7 @@ namespace Karta.WebAPI.Controllers
         [RequirePermission("ManageUsers")]
         [SwaggerOperation(
             Summary = "Ažurira korisnika",
-            Description = "Ažurira osnovne informacije o korisniku (ime, prezime, email, email confirmed status)"
+            Description = "Ažurira osnovne informacije o korisniku (ime, prezime, email confirmed status). Email se ne može mijenjati."
         )]
         [SwaggerResponse(200, "Korisnik uspješno ažuriran", typeof(UserDetailResponse))]
         [SwaggerResponse(400, "Neispravni podaci")]
@@ -97,6 +97,13 @@ namespace Karta.WebAPI.Controllers
                 return NotFound(new { message = "Korisnik nije pronađen" });
             }
 
+            // Email se nikada ne može mijenjati - ignoriraj ako je poslan u requestu
+            if (!string.IsNullOrEmpty(request.Email) && request.Email != user.Email)
+            {
+                _logger.LogWarning("Attempt to change email for user {UserId} was ignored. Email cannot be changed.", id);
+                // Ne vraćamo grešku, samo ignoriramo promjenu emaila
+            }
+
             // Ažuriraj polja koja su navedena
             if (!string.IsNullOrEmpty(request.FirstName))
             {
@@ -106,21 +113,6 @@ namespace Karta.WebAPI.Controllers
             if (!string.IsNullOrEmpty(request.LastName))
             {
                 user.LastName = request.LastName;
-            }
-
-            if (!string.IsNullOrEmpty(request.Email) && request.Email != user.Email)
-            {
-                // Provjeri da li email već postoji
-                var existingUser = await _userManager.FindByEmailAsync(request.Email);
-                if (existingUser != null && existingUser.Id != user.Id)
-                {
-                    return BadRequest(new { message = "Email adresa već postoji" });
-                }
-
-                user.Email = request.Email;
-                user.UserName = request.Email;
-                user.NormalizedEmail = _userManager.NormalizeEmail(request.Email);
-                user.NormalizedUserName = _userManager.NormalizeEmail(request.Email); // Username je email, koristi NormalizeEmail
             }
 
             if (request.EmailConfirmed.HasValue)
@@ -244,11 +236,13 @@ namespace Karta.WebAPI.Controllers
                 return BadRequest(ModelState);
             }
 
-            // Provjeri da li korisnik sa tim emailom već postoji
+            // Provjeri da li korisnik sa tim emailom već postoji (case-insensitive)
+            var normalizedEmail = _userManager.NormalizeEmail(request.Email);
             var existingUser = await _userManager.FindByEmailAsync(request.Email);
             if (existingUser != null)
             {
-                _logger.LogWarning("Attempt to create user with existing email: {Email}", request.Email);
+                _logger.LogWarning("Attempt to create user with existing email: {Email} (normalized: {NormalizedEmail})", 
+                    request.Email, normalizedEmail);
                 return BadRequest(new { message = "Korisnik sa ovom email adresom već postoji" });
             }
 

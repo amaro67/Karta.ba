@@ -272,7 +272,11 @@ app.UseSwaggerUI(c =>
     c.DocumentTitle = "Karta.ba API Documentation";
 });
 
-app.UseHttpsRedirection();
+// Skip HTTPS redirection for webhook endpoint (Stripe CLI uses HTTP)
+app.UseWhen(context => !context.Request.Path.StartsWithSegments("/api/order/webhook"), app =>
+{
+    app.UseHttpsRedirection();
+});
 
 // Add security headers middleware
 app.UseMiddleware<SecurityHeadersMiddleware>();
