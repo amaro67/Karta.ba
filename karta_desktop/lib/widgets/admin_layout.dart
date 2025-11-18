@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../providers/auth_provider.dart';
 import '../providers/admin_provider.dart';
 import '../screens/admin/user_detail_screen.dart';
+import '../screens/admin/event_detail_screen.dart';
 import 'admin_sidebar.dart';
 import '../screens/admin/user_management_screen.dart';
 import '../screens/admin/event_management_screen.dart';
@@ -21,6 +22,10 @@ class _AdminLayoutState extends State<AdminLayout> {
   int _selectedIndex = 0;
 
   void _onItemSelected(int index) {
+    _navigateToIndex(index);
+  }
+
+  void _navigateToIndex(int index) {
     setState(() {
       _selectedIndex = index;
     });
@@ -29,7 +34,9 @@ class _AdminLayoutState extends State<AdminLayout> {
   Widget _getScreenForIndex(int index) {
     switch (index) {
       case 0:
-        return const AdminDashboardContent();
+        return AdminDashboardContent(
+          onSeeAllEvents: () => _navigateToIndex(2),
+        );
       case 1:
         return const UserManagementScreen();
       case 2:
@@ -39,7 +46,9 @@ class _AdminLayoutState extends State<AdminLayout> {
       case 4:
         return const TicketManagementScreen();
       default:
-        return const AdminDashboardContent();
+        return AdminDashboardContent(
+          onSeeAllEvents: () => _navigateToIndex(2),
+        );
     }
   }
 
@@ -260,7 +269,9 @@ class _AdminLayoutState extends State<AdminLayout> {
 
 /// Extracted dashboard content (without Scaffold/AppBar)
 class AdminDashboardContent extends StatefulWidget {
-  const AdminDashboardContent({super.key});
+  final VoidCallback? onSeeAllEvents;
+
+  const AdminDashboardContent({super.key, this.onSeeAllEvents});
 
   @override
   State<AdminDashboardContent> createState() => _AdminDashboardContentState();
@@ -399,7 +410,15 @@ class _AdminDashboardContentState extends State<AdminDashboardContent> {
                   ),
                   TextButton.icon(
                     onPressed: () {
-                      // Navigate to event management (will be handled by parent)
+                      if (widget.onSeeAllEvents != null) {
+                        widget.onSeeAllEvents!();
+                      } else {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const EventManagementScreen(),
+                          ),
+                        );
+                      }
                     },
                     icon: const Icon(Icons.arrow_forward),
                     label: const Text('See all'),
@@ -612,6 +631,35 @@ class _UpcomingEventCard extends StatelessWidget {
 
   const _UpcomingEventCard({required this.event});
 
+  String? _extractEventId() {
+    final possibleKeys = ['id', 'Id', 'eventId', 'EventId'];
+    for (final key in possibleKeys) {
+      final value = event[key];
+      if (value != null) {
+        return value.toString();
+      }
+    }
+    return null;
+  }
+
+  void _openEventDetails(BuildContext context) {
+    final eventId = _extractEventId();
+    if (eventId == null || eventId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to open event details. Missing event ID.'),
+        ),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => EventDetailScreen(eventId: eventId),
+      ),
+    );
+  }
+
   num? _getNumericValue(Map<String, dynamic> map, String key) {
     final value = map[key];
     if (value == null) return null;
@@ -644,60 +692,64 @@ class _UpcomingEventCard extends StatelessWidget {
         margin: const EdgeInsets.only(right: 16),
         child: Card(
           clipBehavior: Clip.antiAlias,
-          child: IntrinsicHeight(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Event image placeholder
-                Container(
-                  height: 80,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: InkWell(
+            onTap: () => _openEventDetails(context),
+            child: IntrinsicHeight(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Event image placeholder
+                  Container(
+                    height: 80,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                    ),
+                    child: const Icon(Icons.event, size: 40, color: Colors.grey),
                   ),
-                  child: const Icon(Icons.event, size: 40, color: Colors.grey),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(10.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        event['title'] as String? ?? event['Title'] as String? ?? 'Event',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        dateFormat.format(startsAt),
-                        style: Theme.of(context).textTheme.bodySmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${event['location'] as String? ?? event['Location'] as String? ?? ''}, ${event['city'] as String? ?? event['City'] as String? ?? ''}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'From $priceFrom $currency',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                    ],
+                  Padding(
+                    padding: const EdgeInsets.all(10.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          event['title'] as String? ?? event['Title'] as String? ?? 'Event',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          dateFormat.format(startsAt),
+                          style: Theme.of(context).textTheme.bodySmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${event['location'] as String? ?? event['Location'] as String? ?? ''}, ${event['city'] as String? ?? event['City'] as String? ?? ''}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'From $priceFrom $currency',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
