@@ -264,6 +264,65 @@ namespace Karta.Service.Services
             };
         }
 
+        public async Task<IReadOnlyList<OrganizerOrderDto>> GetOrganizerOrdersAsync(string organizerId, CancellationToken ct = default)
+        {
+            var events = await _context.Events
+                .Where(e => e.CreatedBy == organizerId)
+                .Select(e => e.Id)
+                .ToListAsync(ct);
+
+            if (!events.Any())
+            {
+                return Array.Empty<OrganizerOrderDto>();
+            }
+
+            var orderItems = await _context.OrderItems
+                .Include(oi => oi.Order)
+                .Include(oi => oi.Event)
+                .Where(oi => events.Contains(oi.EventId))
+                .AsNoTracking()
+                .ToListAsync(ct);
+
+            var userIds = orderItems
+                .Select(oi => oi.Order.UserId)
+                .Where(id => !string.IsNullOrEmpty(id))
+                .Distinct()
+                .ToList();
+
+            var users = await _context.Users
+                .Where(u => userIds.Contains(u.Id))
+                .Select(u => new { u.Id, u.Email })
+                .ToListAsync(ct);
+
+            var userEmailLookup = users.ToDictionary(u => u.Id, u => u.Email ?? string.Empty);
+
+            var groupedOrders = orderItems
+                .GroupBy(oi => oi.OrderId)
+                .Select(group =>
+                {
+                    var order = group.First().Order;
+                    var eventTitle = group.First().Event?.Title ?? "Event";
+                    var eventId = group.First().EventId;
+                    var totalTickets = group.Sum(g => g.Qty);
+
+                    return new OrganizerOrderDto(
+                        order.Id,
+                        userEmailLookup.GetValueOrDefault(order.UserId, string.Empty),
+                        order.CreatedAt,
+                        order.TotalAmount,
+                        order.Currency,
+                        order.Status,
+                        eventTitle,
+                        eventId,
+                        totalTickets
+                    );
+                })
+                .OrderByDescending(o => o.CreatedAt)
+                .ToList();
+
+            return groupedOrders;
+        }
+
         public async Task HandleStripeWebhookAsync(string json, string? signature, CancellationToken ct = default)
         {
             await _stripeService.HandleWebhookAsync(json, signature, ct);

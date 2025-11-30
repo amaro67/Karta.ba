@@ -1,11 +1,15 @@
+using Karta.Model;
 using Karta.Service.DTO;
 using Karta.Service.Interfaces;
 using Karta.WebAPI.Authorization;
 using Karta.WebAPI.Filters;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Swashbuckle.AspNetCore.Annotations;
 using System.Security.Claims;
+using System.Linq;
 
 namespace Karta.WebAPI.Controllers
 {
@@ -19,10 +23,12 @@ namespace Karta.WebAPI.Controllers
     public class EventController : ControllerBase
     {
         private readonly IEventService _eventService;
+            private readonly UserManager<ApplicationUser> _userManager;
 
-        public EventController(IEventService eventService)
+        public EventController(IEventService eventService, UserManager<ApplicationUser> userManager)
         {
             _eventService = eventService;
+            _userManager = userManager;
         }
 
         [HttpGet]
@@ -86,6 +92,10 @@ namespace Karta.WebAPI.Controllers
             if (string.IsNullOrEmpty(userId))
                 return Unauthorized();
 
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                return Unauthorized();
+
             try
             {
                 var eventDto = await _eventService.CreateEventAsync(request, userId);
@@ -107,6 +117,23 @@ namespace Karta.WebAPI.Controllers
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(userId))
                 return Unauthorized();
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                return Unauthorized();
+
+            var roles = await _userManager.GetRolesAsync(user);
+            var isOrganizer = roles.Contains("Organizer");
+            var isAdmin = roles.Contains("Admin");
+
+            if (!string.IsNullOrEmpty(request.Status) &&
+                request.Status.Equals("Published", StringComparison.OrdinalIgnoreCase) &&
+                isOrganizer &&
+                !isAdmin &&
+                !user.IsOrganizerVerified)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "Organizator mora biti verifikovan od strane admina prije objave događaja." });
+            }
 
             try
             {

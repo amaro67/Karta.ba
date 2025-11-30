@@ -5,9 +5,13 @@ import 'providers/admin_provider.dart';
 import 'providers/event_provider.dart';
 import 'providers/order_provider.dart';
 import 'providers/ticket_provider.dart';
+import 'providers/organizer_provider.dart';
+import 'providers/scanner_provider.dart';
+import 'providers/organizer_sales_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/admin/user_detail_screen.dart';
 import 'widgets/admin_layout.dart';
+import 'widgets/organizer_layout.dart';
 
 void main() {
   runApp(const KartaDesktopApp());
@@ -40,6 +44,30 @@ class KartaDesktopApp extends StatelessWidget {
         ChangeNotifierProxyProvider<AuthProvider, TicketProvider>(
           create: (_) => TicketProvider(AuthProvider()),
           update: (_, authProvider, __) => TicketProvider(authProvider),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, OrganizerProvider>(
+          create: (_) => OrganizerProvider(AuthProvider()),
+          update: (_, authProvider, organizerProvider) {
+            organizerProvider ??= OrganizerProvider(authProvider);
+            organizerProvider.updateAuthProvider(authProvider);
+            return organizerProvider;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, ScannerProvider>(
+          create: (_) => ScannerProvider(AuthProvider()),
+          update: (_, authProvider, scannerProvider) {
+            scannerProvider ??= ScannerProvider(authProvider);
+            scannerProvider.updateAuthProvider(authProvider);
+            return scannerProvider;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, OrganizerSalesProvider>(
+          create: (_) => OrganizerSalesProvider(AuthProvider()),
+          update: (_, authProvider, salesProvider) {
+            salesProvider ??= OrganizerSalesProvider(authProvider);
+            salesProvider.updateAuthProvider(authProvider);
+            return salesProvider;
+          },
         ),
       ],
       child: MaterialApp(
@@ -157,6 +185,9 @@ class _AppWrapperState extends State<AppWrapper> {
         final user = authProvider.currentUser!;
         if (user.isAdmin) {
           return const AdminLayout();
+        }
+        if (user.isOrganizer) {
+          return const OrganizerLayout();
         }
         return const MainApp();
       },

@@ -309,6 +309,7 @@ namespace Karta.Service.Services
                 u.FirstName,
                 u.LastName,
                 u.EmailConfirmed,
+                u.IsOrganizerVerified,
                 new string[0]
             )).ToList();
 

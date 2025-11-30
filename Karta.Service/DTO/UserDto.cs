@@ -70,6 +70,12 @@ namespace Karta.Service.DTO
     );
 
     /// <summary>
+    /// Zahtjev za postavljanje verifikacije organizatora
+    /// </summary>
+    /// <param name="IsVerified">Nova vrijednost verifikacije</param>
+    public record OrganizerVerificationRequest(bool IsVerified);
+
+    /// <summary>
     /// Detaljni odgovor sa informacijama o korisniku
     /// </summary>
     public record UserDetailResponse(
@@ -97,6 +103,11 @@ namespace Karta.Service.DTO
         /// Da li je email potvrđen
         /// </summary>
         bool EmailConfirmed,
+
+        /// <summary>
+        /// Da li je organizator potvrđen od strane admina
+        /// </summary>
+        bool IsOrganizerVerified,
         
         /// <summary>
         /// Datum kreiranja korisnika

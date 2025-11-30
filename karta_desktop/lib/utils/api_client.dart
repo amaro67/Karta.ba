@@ -282,6 +282,7 @@ class ApiClient {
           'firstName': jsonData['FirstName'] ?? jsonData['firstName'],
           'lastName': jsonData['LastName'] ?? jsonData['lastName'],
           'emailConfirmed': jsonData['EmailConfirmed'] ?? jsonData['emailConfirmed'],
+          'isOrganizerVerified': jsonData['IsOrganizerVerified'] ?? jsonData['isOrganizerVerified'] ?? false,
           'roles': jsonData['Roles'] ?? jsonData['roles'],
         };
         
@@ -375,6 +376,40 @@ class ApiClient {
     }
   }
 
+  static Future<List<dynamic>> getList(String endpoint, {String? token}) async {
+    try {
+      final response = await _client.get(
+        Uri.parse('$baseUrl$apiPrefix$endpoint'),
+        headers: _getHeaders(token: token),
+      );
+
+      if (response.statusCode == 200) {
+        if (response.body.isEmpty) {
+          return [];
+        }
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          return decoded;
+        }
+        throw Exception('Unexpected response format: expected List, got ${decoded.runtimeType}');
+      } else {
+        String errorMessage = 'Request failed with status ${response.statusCode}';
+        if (response.body.isNotEmpty) {
+          final errorData = jsonDecode(response.body);
+          if (errorData is Map && errorData.containsKey('message')) {
+            errorMessage = errorData['message'] as String;
+          }
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      if (e is SocketException) {
+        throw Exception('Unable to connect to server. Please check your connection.');
+      }
+      rethrow;
+    }
+  }
+
   // Generic POST request with authentication
   static Future<Map<String, dynamic>> post(String endpoint, Map<String, dynamic> data, {String? token}) async {
     try {
@@ -432,6 +467,26 @@ class ApiClient {
       if (response.statusCode != 200 && response.statusCode != 204) {
         final errorData = jsonDecode(response.body);
         throw Exception(errorData['message'] ?? 'Delete failed');
+      }
+    } catch (e) {
+      if (e is SocketException) {
+        throw Exception('Unable to connect to server. Please check your connection.');
+      }
+      rethrow;
+    }
+  }
+
+  static Future<void> postVoid(String endpoint, Map<String, dynamic> data, {String? token}) async {
+    try {
+      final response = await _client.post(
+        Uri.parse('$baseUrl$apiPrefix$endpoint'),
+        headers: _getHeaders(token: token),
+        body: jsonEncode(data),
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 201 && response.statusCode != 204) {
+        final errorData = jsonDecode(response.body);
+        throw Exception(errorData['message'] ?? 'Request failed');
       }
     } catch (e) {
       if (e is SocketException) {
@@ -637,6 +692,13 @@ class ApiClient {
     return await put('/User/$userId', userData, token: token);
   }
 
+  /// Set organizer verification
+  static Future<Map<String, dynamic>> setOrganizerVerification(String token, String userId, bool isVerified) async {
+    return await post('/User/$userId/organizer-verification', {
+      'isVerified': isVerified,
+    }, token: token);
+  }
+
   /// Delete user
   static Future<void> deleteUser(String token, String userId) async {
     return await delete('/User/$userId', token: token);
@@ -754,6 +816,40 @@ class ApiClient {
     return await get('/Event/$eventId', token: token);
   }
 
+  /// Get events created by the currently authenticated organizer
+  static Future<List<dynamic>> getMyEvents(String token) async {
+    try {
+      final response = await _client.get(
+        Uri.parse('$baseUrl$apiPrefix/Event/my-events'),
+        headers: _getHeaders(token: token),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is List) {
+          return List<dynamic>.from(data);
+        }
+        throw Exception('Unexpected response format for organizer events');
+      } else {
+        String errorMessage = 'Failed to load organizer events';
+        try {
+          if (response.body.isNotEmpty) {
+            final errorData = jsonDecode(response.body);
+            errorMessage = _extractErrorMessage(errorData);
+          }
+        } catch (_) {
+          errorMessage = response.body.isNotEmpty ? response.body : errorMessage;
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      if (e is SocketException) {
+        throw Exception('Unable to connect to server. Please check your connection.');
+      }
+      rethrow;
+    }
+  }
+
   /// Create event
   static Future<Map<String, dynamic>> createEvent(String token, Map<String, dynamic> eventData) async {
     return await post('/Event', eventData, token: token);
@@ -767,6 +863,32 @@ class ApiClient {
   /// Delete event
   static Future<void> deleteEvent(String token, String eventId) async {
     return await delete('/Event/$eventId', token: token);
+  }
+
+  // ==================== Scanner Management Endpoints ====================
+
+  static Future<List<dynamic>> getScannerEvents(String token) async {
+    return await getList('/Scanner/events', token: token);
+  }
+
+  static Future<List<dynamic>> getScannerUsers(String token) async {
+    return await getList('/Scanner/users', token: token);
+  }
+
+  static Future<Map<String, dynamic>> createScanner(String token, Map<String, dynamic> data) async {
+    return await post('/Scanner', data, token: token);
+  }
+
+  static Future<void> assignScannerToEvent(String token, Map<String, dynamic> data) async {
+    return await postVoid('/Scanner/assign', data, token: token);
+  }
+
+  static Future<void> removeScannerFromEvent(String token, String eventId, String scannerUserId) async {
+    return await delete('/Scanner/assign/$eventId/$scannerUserId', token: token);
+  }
+
+  static Future<List<dynamic>> getOrganizerSales(String token) async {
+    return await getList('/Order/organizer-sales', token: token);
   }
 
   // ==================== Order Management Endpoints ====================

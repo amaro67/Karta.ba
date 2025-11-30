@@ -130,6 +130,11 @@ namespace Karta.Service.DTO
         /// Da li je email potvrđen
         /// </summary>
         bool EmailConfirmed,
+
+        /// <summary>
+        /// Da li je organizator potvrđen od strane admina
+        /// </summary>
+        bool IsOrganizerVerified,
         
         /// <summary>
         /// Role korisnika

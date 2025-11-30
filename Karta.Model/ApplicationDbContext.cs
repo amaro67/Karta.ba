@@ -18,6 +18,7 @@ namespace Karta.Model
         public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<Ticket> Tickets { get; set; }
         public DbSet<ScanLog> ScanLogs { get; set; }
+        public DbSet<EventScannerAssignment> EventScannerAssignments { get; set; }
         public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
@@ -37,6 +38,13 @@ namespace Karta.Model
                     .IsRequired();
 
                 entity.Property(e => e.LastLoginAt);
+
+                entity.Property(e => e.IsOrganizerVerified)
+                    .IsRequired()
+                    .HasDefaultValue(false);
+
+                entity.Property(e => e.CreatedByOrganizerId)
+                    .HasMaxLength(450);
 
                 // Ensure email is unique
                 entity.HasIndex(e => e.NormalizedEmail)
@@ -269,6 +277,31 @@ namespace Karta.Model
                 entity.HasIndex(e => e.Token);
                 entity.HasIndex(e => e.UserId);
                 entity.HasIndex(e => e.ExpiresAt);
+            });
+
+            builder.Entity<EventScannerAssignment>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.ScannerUserId)
+                    .IsRequired()
+                    .HasMaxLength(450);
+
+                entity.Property(e => e.AssignedAt)
+                    .IsRequired();
+
+                entity.HasOne(e => e.Event)
+                    .WithMany()
+                    .HasForeignKey(e => e.EventId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.Scanner)
+                    .WithMany()
+                    .HasForeignKey(e => e.ScannerUserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => new { e.EventId, e.ScannerUserId }).IsUnique();
+                entity.HasIndex(e => e.ScannerUserId);
             });
         }
     }

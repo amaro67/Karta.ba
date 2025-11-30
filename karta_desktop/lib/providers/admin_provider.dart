@@ -264,6 +264,31 @@ class AdminProvider extends ChangeNotifier {
     }
   }
 
+  /// Toggle organizer verification
+  Future<bool> setOrganizerVerification(String userId, bool isVerified) async {
+    final token = _authProvider.accessToken;
+    if (token == null) {
+      _usersError = 'Not authenticated';
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      await ApiClient.setOrganizerVerification(token, userId, isVerified);
+      _usersError = null;
+      await loadUsers();
+
+      if (_authProvider.currentUser?.id == userId) {
+        await _authProvider.refreshCurrentUser();
+      }
+      return true;
+    } catch (e) {
+      _usersError = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Delete user
   Future<bool> deleteUser(String userId) async {
     final token = _authProvider.accessToken;

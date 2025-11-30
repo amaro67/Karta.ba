@@ -236,6 +236,7 @@ class AuthProvider extends ChangeNotifier {
         firstName: userData['firstName'] as String? ?? '',
         lastName: userData['lastName'] as String? ?? '',
         emailConfirmed: userData['emailConfirmed'] as bool? ?? false,
+        isOrganizerVerified: userData['isOrganizerVerified'] as bool? ?? false,
         roles: (userData['roles'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
       );
       
@@ -440,6 +441,10 @@ class AuthProvider extends ChangeNotifier {
 
   // Check if user is regular user
   bool get isUser => hasRole('User');
+
+  bool get isOrganizerVerified => _currentUser?.isOrganizerVerified ?? false;
+
+  bool get canPublishEvents => isAdmin || (isOrganizer && isOrganizerVerified);
 
   @override
   void dispose() {

@@ -245,6 +245,7 @@ namespace Karta.WebAPI.Controllers
                         user.FirstName ?? "",
                         user.LastName ?? "",
                         user.EmailConfirmed,
+                        user.IsOrganizerVerified,
                         roles.ToArray()
                     )
                 );
@@ -338,6 +339,7 @@ namespace Karta.WebAPI.Controllers
                         user.FirstName ?? "",
                         user.LastName ?? "",
                         user.EmailConfirmed,
+                        user.IsOrganizerVerified,
                         roles.ToArray()
                     )
                 );
@@ -512,6 +514,7 @@ namespace Karta.WebAPI.Controllers
                 FirstName: user.FirstName ?? string.Empty,
                 LastName: user.LastName ?? string.Empty,
                 EmailConfirmed: user.EmailConfirmed,
+                IsOrganizerVerified: user.IsOrganizerVerified,
                 CreatedAt: user.CreatedAt,
                 LastLoginAt: user.LastLoginAt,
                 Roles: roles.ToArray()
@@ -596,6 +599,7 @@ namespace Karta.WebAPI.Controllers
                     user.FirstName ?? "",
                     user.LastName ?? "",
                     user.EmailConfirmed,
+                    user.IsOrganizerVerified,
                     roles.ToArray()
                 )
             );

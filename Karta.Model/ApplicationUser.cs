@@ -9,5 +9,7 @@ namespace Karta.Model
         public string? LastName { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? LastLoginAt { get; set; }
+        public bool IsOrganizerVerified { get; set; } = false;
+        public string? CreatedByOrganizerId { get; set; }
     }
 }

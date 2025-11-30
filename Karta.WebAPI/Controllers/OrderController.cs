@@ -155,6 +155,19 @@ namespace Karta.WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpGet("organizer-sales")]
+        [ProducesResponseType(typeof(IReadOnlyList<OrganizerOrderDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<ActionResult<IReadOnlyList<OrganizerOrderDto>>> GetOrganizerSales(CancellationToken ct = default)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized();
+
+            var orders = await _orderService.GetOrganizerOrdersAsync(userId, ct);
+            return Ok(orders);
+        }
+
         [HttpPost("webhook")]
         [AllowAnonymous]
         [DisableRateLimiting]

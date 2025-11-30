@@ -9,6 +9,7 @@ class UserInfo {
   final String firstName;
   final String lastName;
   final bool emailConfirmed;
+  final bool isOrganizerVerified;
   final List<String> roles;
 
   const UserInfo({
@@ -17,6 +18,7 @@ class UserInfo {
     required this.firstName,
     required this.lastName,
     required this.emailConfirmed,
+    required this.isOrganizerVerified,
     required this.roles,
   });
 
@@ -31,4 +33,5 @@ class UserInfo {
   bool get isOrganizer => roles.contains('Organizer');
   bool get isScanner => roles.contains('Scanner');
   bool get isUser => roles.contains('User');
+  bool get canPublishEvents => isAdmin || (isOrganizer && isOrganizerVerified);
 }

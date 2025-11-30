@@ -3,6 +3,7 @@ using System;
 using Karta.Model;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Karta.Model.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251122215908_AddIsOrganizerVerifiedToUsers")]
+    partial class AddIsOrganizerVerifiedToUsers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.8");
@@ -63,10 +66,6 @@ namespace Karta.Model.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("CreatedByOrganizerId")
-                        .HasMaxLength(450)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Email")
@@ -218,33 +217,6 @@ namespace Karta.Model.Migrations
                     b.HasIndex("Status");
 
                     b.ToTable("Events");
-                });
-
-            modelBuilder.Entity("Karta.Model.Entities.EventScannerAssignment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("AssignedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("EventId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ScannerUserId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ScannerUserId");
-
-                    b.HasIndex("EventId", "ScannerUserId")
-                        .IsUnique();
-
-                    b.ToTable("EventScannerAssignments");
                 });
 
             modelBuilder.Entity("Karta.Model.Entities.Order", b =>
@@ -570,25 +542,6 @@ namespace Karta.Model.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
-                });
-
-            modelBuilder.Entity("Karta.Model.Entities.EventScannerAssignment", b =>
-                {
-                    b.HasOne("Karta.Model.Entities.Event", "Event")
-                        .WithMany()
-                        .HasForeignKey("EventId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Karta.Model.ApplicationUser", "Scanner")
-                        .WithMany()
-                        .HasForeignKey("ScannerUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Event");
-
-                    b.Navigation("Scanner");
                 });
 
             modelBuilder.Entity("Karta.Model.Entities.OrderItem", b =>

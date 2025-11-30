@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/event_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../model/event/event_dto.dart';
 import '../../utils/base_textfield.dart';
 import '../../utils/error_dialog.dart';
@@ -25,6 +26,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
   final _categoryController = TextEditingController();
   final _tagsController = TextEditingController();
   final _coverImageUrlController = TextEditingController();
+  final List<_TicketOptionController> _ticketOptions = [];
+  final List<String> _supportedCurrencies = const ['BAM', 'EUR', 'USD'];
 
   DateTime? _startsAt;
   DateTime? _endsAt;
@@ -39,6 +42,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
     } else {
       _countryController.text = 'Bosnia and Herzegovina';
     }
+    _initializeTicketOptions();
     // Add listener to update image preview
     _coverImageUrlController.addListener(() {
       if (mounted) {
@@ -63,6 +67,23 @@ class _EventFormScreenState extends State<EventFormScreen> {
     _status = validStatuses.contains(event.status) ? event.status : 'Draft';
   }
 
+  void _initializeTicketOptions() {
+    if (widget.event != null && widget.event!.priceTiers.isNotEmpty) {
+      for (final tier in widget.event!.priceTiers) {
+        _ticketOptions.add(
+          _TicketOptionController(
+            name: tier.name,
+            price: tier.price.toStringAsFixed(2),
+            capacity: tier.capacity.toString(),
+            currency: tier.currency,
+          ),
+        );
+      }
+    } else {
+      _ticketOptions.add(_TicketOptionController());
+    }
+  }
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -73,6 +94,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
     _categoryController.dispose();
     _tagsController.dispose();
     _coverImageUrlController.dispose();
+    for (final option in _ticketOptions) {
+      option.dispose();
+    }
     super.dispose();
   }
 
@@ -131,6 +155,19 @@ class _EventFormScreenState extends State<EventFormScreen> {
 
     setState(() => _isLoading = true);
 
+    List<Map<String, dynamic>>? priceTiers;
+    try {
+      priceTiers = _buildPriceTiersPayload();
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ErrorDialog.show(
+        context,
+        title: 'Validation Error',
+        message: e.toString(),
+      );
+      return;
+    }
+
     final eventData = {
       'title': _titleController.text.trim(),
       'description': _descriptionController.text.trim().isEmpty
@@ -148,7 +185,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
       'coverImageUrl': _coverImageUrlController.text.trim().isEmpty
           ? null
           : _coverImageUrlController.text.trim(),
-      if (widget.event != null) 'status': _status,
+      if (widget.event != null && _status != widget.event!.status) 'status': _status,
+      'priceTiers': priceTiers,
     };
 
     final eventProvider = context.read<EventProvider>();
@@ -179,8 +217,50 @@ class _EventFormScreenState extends State<EventFormScreen> {
     }
   }
 
+  List<Map<String, dynamic>> _buildPriceTiersPayload() {
+    if (_ticketOptions.isEmpty) {
+      throw Exception('Dodajte barem jednu opciju karte.');
+    }
+
+    final tiers = <Map<String, dynamic>>[];
+
+    for (var i = 0; i < _ticketOptions.length; i++) {
+      final option = _ticketOptions[i];
+      final tierIndex = i + 1;
+      final name = option.nameController.text.trim();
+      final priceText = option.priceController.text.trim().replaceAll(',', '.');
+      final capacityText = option.capacityController.text.trim();
+      final price = double.tryParse(priceText);
+      final capacity = int.tryParse(capacityText);
+
+      if (name.isEmpty) {
+        throw Exception('Unesite naziv za opciju karte #$tierIndex.');
+      }
+      if (price == null || price <= 0) {
+        throw Exception('Unesite validnu cijenu za opciju karte #$tierIndex.');
+      }
+      if (capacity == null || capacity <= 0) {
+        throw Exception('Unesite validan kapacitet za opciju karte #$tierIndex.');
+      }
+
+      tiers.add({
+        'name': name,
+        'price': price,
+        'currency': option.currency,
+        'capacity': capacity,
+      });
+    }
+
+    return tiers;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final bool showVerificationBanner =
+        authProvider.isOrganizer && !authProvider.isAdmin && !authProvider.isOrganizerVerified;
+    final bool publishDisabled = widget.event != null && showVerificationBanner;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.event == null ? 'Create Event' : 'Edit Event'),
@@ -196,7 +276,37 @@ class _EventFormScreenState extends State<EventFormScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Basic Information Section
+                  // Verification banner
+                  if (showVerificationBanner) ...[
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orangeAccent),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.warning_amber_outlined, color: Colors.orange),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Vaš organizatorski profil još nije verifikovan. Događaji će ostati u Draft statusu dok admin ne potvrdi vaš nalog.',
+                              style: TextStyle(
+                                color: Colors.orange.shade900,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // Basic Information Section
                     _SectionCard(
                       title: 'Basic Information',
                       icon: Icons.info_outline,
@@ -340,6 +450,55 @@ class _EventFormScreenState extends State<EventFormScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
+                    _SectionCard(
+                      title: 'Ticket Options',
+                      icon: Icons.confirmation_number_outlined,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Dodajte različite vrste karata (npr. Early Bird, VIP, Regular) sa cijenom i kapacitetom.',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Colors.grey.shade600,
+                                ),
+                          ),
+                          const SizedBox(height: 20),
+                          ..._ticketOptions.asMap().entries.map(
+                            (entry) => Padding(
+                              padding: EdgeInsets.only(bottom: entry.key == _ticketOptions.length - 1 ? 0 : 16),
+                              child: _TicketOptionCard(
+                                option: entry.value,
+                                currencies: _supportedCurrencies,
+                                onRemove: _ticketOptions.length == 1
+                                    ? null
+                                    : () {
+                                        setState(() {
+                                          entry.value.dispose();
+                                          _ticketOptions.removeAt(entry.key);
+                                        });
+                                      },
+                                onCurrencyChanged: (currency) {
+                                  setState(() {
+                                    entry.value.currency = currency;
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _ticketOptions.add(_TicketOptionController());
+                              });
+                            },
+                            icon: const Icon(Icons.add),
+                            label: const Text('Dodaj opciju karte'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
                     // Media Section
                     _SectionCard(
                       title: 'Media',
@@ -385,7 +544,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                         title: 'Status',
                         icon: Icons.flag_outlined,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(10),
@@ -393,104 +552,130 @@ class _EventFormScreenState extends State<EventFormScreen> {
                               color: const Color(0xFFE0E0E0),
                             ),
                           ),
-                          child: DropdownButtonFormField<String>(
-                            value: _status,
-                            decoration: InputDecoration(
-                              labelText: 'Status',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide.none,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide.none,
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide.none,
-                              ),
-                              filled: true,
-                              fillColor: Colors.transparent,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                            ),
-                            items: [
-                              DropdownMenuItem(
-                                value: 'Draft',
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: Colors.orange,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    const Text('Draft'),
-                                  ],
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              DropdownButtonFormField<String>(
+                                value: _status,
+                                decoration: InputDecoration(
+                                  labelText: 'Status',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.transparent,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
                                 ),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Published',
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: Colors.green,
-                                        shape: BoxShape.circle,
-                                      ),
+                                items: [
+                                  DropdownMenuItem(
+                                    value: 'Draft',
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: const BoxDecoration(
+                                            color: Colors.orange,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        const Text('Draft'),
+                                      ],
                                     ),
-                                    const SizedBox(width: 12),
-                                    const Text('Published'),
-                                  ],
-                                ),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Cancelled',
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'Published',
+                                    enabled: !publishDisabled,
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: const BoxDecoration(
+                                            color: Colors.green,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        const Text('Published'),
+                                      ],
                                     ),
-                                    const SizedBox(width: 12),
-                                    const Text('Cancelled'),
-                                  ],
-                                ),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Archived',
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: Colors.grey,
-                                        shape: BoxShape.circle,
-                                      ),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'Cancelled',
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: const BoxDecoration(
+                                            color: Colors.red,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        const Text('Cancelled'),
+                                      ],
                                     ),
-                                    const SizedBox(width: 12),
-                                    const Text('Archived'),
-                                  ],
-                                ),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'Archived',
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: const BoxDecoration(
+                                            color: Colors.grey,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        const Text('Archived'),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  if (value == 'Published' && publishDisabled) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Admin mora verifikovati vaš nalog prije objave događaja.'),
+                                        backgroundColor: Colors.orange,
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  if (value != null) {
+                                    setState(() => _status = value);
+                                  }
+                                },
                               ),
+                              if (publishDisabled)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8, left: 8, right: 8),
+                                  child: Text(
+                                    'Objava događaja će biti omogućena nakon admin verifikacije.',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade800,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
                             ],
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() => _status = value);
-                              }
-                            },
                           ),
                         ),
                       ),
@@ -544,6 +729,143 @@ class _EventFormScreenState extends State<EventFormScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _TicketOptionController {
+  final TextEditingController nameController;
+  final TextEditingController priceController;
+  final TextEditingController capacityController;
+  String currency;
+
+  _TicketOptionController({
+    String name = '',
+    String price = '',
+    String capacity = '',
+    String? currency,
+  })  : nameController = TextEditingController(text: name),
+        priceController = TextEditingController(text: price),
+        capacityController = TextEditingController(text: capacity),
+        currency = currency ?? 'BAM';
+
+  void dispose() {
+    nameController.dispose();
+    priceController.dispose();
+    capacityController.dispose();
+  }
+}
+
+class _TicketOptionCard extends StatelessWidget {
+  final _TicketOptionController option;
+  final List<String> currencies;
+  final VoidCallback? onRemove;
+  final ValueChanged<String> onCurrencyChanged;
+
+  const _TicketOptionCard({
+    required this.option,
+    required this.currencies,
+    this.onRemove,
+    required this.onCurrencyChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+        color: Colors.white,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Opcija karte',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              if (onRemove != null)
+                IconButton(
+                  tooltip: 'Ukloni opciju',
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.delete_outline),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          BaseTextField(
+            label: 'Naziv *',
+            hint: 'npr. Early Bird, VIP',
+            controller: option.nameController,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: BaseTextField(
+                  label: 'Cijena *',
+                  hint: 'npr. 25.00',
+                  controller: option.priceController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 130,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Valuta',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF212121),
+                            fontSize: 13,
+                          ),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      value: option.currency,
+                      items: currencies
+                          .map(
+                            (currency) => DropdownMenuItem(
+                              value: currency,
+                              child: Text(currency),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          onCurrencyChanged(value);
+                        }
+                      },
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          BaseTextField(
+            label: 'Kapacitet *',
+            hint: 'Koliko karata ove vrste je dostupno',
+            controller: option.capacityController,
+            keyboardType: TextInputType.number,
+          ),
+        ],
       ),
     );
   }

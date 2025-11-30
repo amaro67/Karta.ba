@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/admin_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/organizer_provider.dart';
+import '../../model/event/event_dto.dart';
 import 'order_detail_screen.dart';
 
 class UserDetailScreen extends StatefulWidget {
@@ -29,6 +31,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
   late bool _emailConfirmed;
   late String _userId;
   late Set<String> _currentRoles;
+  bool _isOrganizerVerified = false;
+  bool _isVerifyingOrganizer = false;
   final List<String> _availableRoles = ['User', 'Organizer', 'Scanner', 'Admin'];
   bool _isEditing = false;
   bool _isSaving = false;
@@ -41,6 +45,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     _emailController = TextEditingController(text: widget.user['email'] as String? ?? '');
     _emailConfirmed = widget.user['emailConfirmed'] == true;
     _userId = (widget.user['id'] ?? widget.user['Id']) as String? ?? '';
+    _isOrganizerVerified = widget.user['isOrganizerVerified'] == true ||
+        widget.user['IsOrganizerVerified'] == true;
     
     final initialRoles = (widget.user['roles'] as List<dynamic>? ?? [])
         .map((r) => r.toString())
@@ -52,12 +58,21 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     
     // Load user orders - use addPostFrameCallback to avoid calling during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if (!mounted) return;
+      if (_isViewingOwnOrganizerProfile) {
+        final organizerProvider = Provider.of<OrganizerProvider>(context, listen: false);
+        if (!organizerProvider.isLoadingMyEvents) {
+          organizerProvider.loadMyEvents();
+        }
+      } else {
         final adminProvider = Provider.of<AdminProvider>(context, listen: false);
         adminProvider.loadUserOrders(_userId);
       }
     });
   }
+
+  bool get _isViewingOwnOrganizerProfile =>
+      widget.isOwnProfile && _currentRoles.contains('Organizer');
 
   @override
   void dispose() {
@@ -203,6 +218,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         if (success) {
           setState(() {
             _currentRoles.add(role);
+            if (role == 'Organizer') {
+              _isOrganizerVerified = false;
+            }
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -230,6 +248,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         if (success) {
           setState(() {
             _currentRoles.remove(role);
+            if (role == 'Organizer') {
+              _isOrganizerVerified = false;
+            }
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -253,11 +274,46 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     }
   }
 
+  Future<void> _handleOrganizerVerificationToggle(bool value) async {
+    if (widget.isOwnProfile) return;
+
+    setState(() {
+      _isVerifyingOrganizer = true;
+    });
+
+    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+    final success = await adminProvider.setOrganizerVerification(_userId, value);
+
+    if (!mounted) return;
+
+    setState(() {
+      _isVerifyingOrganizer = false;
+      if (success) {
+        _isOrganizerVerified = value;
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? (value
+                  ? 'Organizer je uspješno verifikovan'
+                  : 'Verifikacija organizatora je uklonjena')
+              : adminProvider.usersError ?? 'Greška pri ažuriranju verifikacije',
+        ),
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
+    );
+  }
+
   void _loadUserData() {
     _firstNameController.text = widget.user['firstName'] as String? ?? '';
     _lastNameController.text = widget.user['lastName'] as String? ?? '';
     _emailController.text = widget.user['email'] as String? ?? '';
     _emailConfirmed = widget.user['emailConfirmed'] == true;
+    _isOrganizerVerified = widget.user['isOrganizerVerified'] == true ||
+        widget.user['IsOrganizerVerified'] == true;
     
     final initialRoles = (widget.user['roles'] as List<dynamic>? ?? [])
         .map((r) => r.toString())
@@ -332,6 +388,12 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                             availableRoles: _availableRoles,
                             isEditing: _isEditing,
                             isOwnProfile: widget.isOwnProfile,
+                            isOrganizerVerified: _isOrganizerVerified,
+                            showOrganizerVerification: !widget.isOwnProfile && _currentRoles.contains('Organizer'),
+                            isVerificationInProgress: _isVerifyingOrganizer,
+                            onOrganizerVerificationChanged: widget.isOwnProfile
+                                ? null
+                                : _handleOrganizerVerificationToggle,
                             onEditToggle: () {
                               setState(() {
                                 _isEditing = true;
@@ -361,7 +423,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           // Right side - User Orders
           Expanded(
             flex: 1,
-            child: _UserOrdersList(userId: _userId),
+            child: _isViewingOwnOrganizerProfile
+                ? const _OrganizerProfileStatsPanel()
+                : _UserOrdersList(userId: _userId),
           ),
         ],
       ),
@@ -551,9 +615,13 @@ class _TicketBody extends StatelessWidget {
   final List<String> availableRoles;
   final bool isEditing;
   final bool isOwnProfile;
+  final bool showOrganizerVerification;
+  final bool isOrganizerVerified;
+  final bool isVerificationInProgress;
   final VoidCallback onEditToggle;
   final ValueChanged<bool> onEmailConfirmedChanged;
   final Function(String, bool) onRoleToggle;
+  final ValueChanged<bool>? onOrganizerVerificationChanged;
   final Color Function(String) getRoleColor;
 
   const _TicketBody({
@@ -565,9 +633,13 @@ class _TicketBody extends StatelessWidget {
     required this.availableRoles,
     required this.isEditing,
     this.isOwnProfile = false,
+    this.showOrganizerVerification = false,
+    required this.isOrganizerVerified,
+    this.isVerificationInProgress = false,
     required this.onEditToggle,
     required this.onEmailConfirmedChanged,
     required this.onRoleToggle,
+    this.onOrganizerVerificationChanged,
     required this.getRoleColor,
   });
 
@@ -728,6 +800,89 @@ class _TicketBody extends StatelessWidget {
           );
           }),
         ],
+        if (!isOwnProfile && showOrganizerVerification) ...[
+          const SizedBox(height: 32),
+          Text(
+            'ORGANIZER VERIFICATION',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade600,
+              letterSpacing: 2,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isOrganizerVerified ? Colors.green.shade200 : Colors.orange.shade200,
+              ),
+              color: (isOrganizerVerified ? Colors.green : Colors.orange).withOpacity(0.05),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      isOrganizerVerified ? Icons.verified_outlined : Icons.hourglass_bottom_outlined,
+                      color: isOrganizerVerified ? Colors.green : Colors.orange,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      isOrganizerVerified ? 'Verified organizer' : 'Pending verification',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: isOrganizerVerified ? Colors.green.shade800 : Colors.orange.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  isOrganizerVerified
+                      ? 'Korisnik može objavljivati svoje događaje.'
+                      : 'Korisnik ne može objaviti događaj dok admin ne potvrdi organizatora.',
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: (onOrganizerVerificationChanged == null || isVerificationInProgress)
+                          ? null
+                          : () => onOrganizerVerificationChanged!.call(!isOrganizerVerified),
+                      icon: isVerificationInProgress
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              isOrganizerVerified ? Icons.shield_moon_outlined : Icons.verified_user_outlined,
+                            ),
+                      label: Text(
+                        isOrganizerVerified ? 'Remove verification' : 'Verify organizer',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isOrganizerVerified ? Colors.redAccent : Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -804,7 +959,7 @@ class _TicketField extends StatelessWidget {
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           ),
         ),
-      ],
+        ],
     );
   }
 }
@@ -827,6 +982,416 @@ class _PerforationPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _OrganizerProfileStatsPanel extends StatefulWidget {
+  const _OrganizerProfileStatsPanel({super.key});
+
+  @override
+  State<_OrganizerProfileStatsPanel> createState() => _OrganizerProfileStatsPanelState();
+}
+
+class _OrganizerProfileStatsPanelState extends State<_OrganizerProfileStatsPanel> {
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final organizerProvider = Provider.of<OrganizerProvider>(context, listen: false);
+      if (!organizerProvider.isLoadingMyEvents && organizerProvider.myEvents.isEmpty) {
+        organizerProvider.loadMyEvents();
+      }
+      _initialized = true;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<OrganizerProvider>(
+      builder: (context, organizerProvider, child) {
+        final events = organizerProvider.myEvents;
+
+        if (organizerProvider.isLoadingMyEvents && events.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (organizerProvider.myEventsError != null && events.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, color: Colors.red.shade600, size: 48),
+                const SizedBox(height: 12),
+                Text(
+                  'Greška pri učitavanju događaja',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  organizerProvider.myEventsError ?? '',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: organizerProvider.refreshMyEvents,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Pokušaj ponovo'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final displayedEvents = events.take(5).toList();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.shade200),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Pregled organizatora',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Brzi pregled performansi tvojih događaja.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Colors.grey.shade600,
+                            ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Osvježi podatke',
+                    onPressed: organizerProvider.refreshMyEvents,
+                    icon: const Icon(Icons.refresh),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ProfileStatCard(
+                          label: 'Ukupno događaja',
+                          value: organizerProvider.totalEvents.toString(),
+                          icon: Icons.event,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ProfileStatCard(
+                          label: 'Objavljeni',
+                          value: organizerProvider.publishedEvents.toString(),
+                          icon: Icons.check_circle,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ProfileStatCard(
+                          label: 'Skice',
+                          value: organizerProvider.draftEvents.toString(),
+                          icon: Icons.edit_note,
+                          color: Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ProfileStatCard(
+                          label: 'Nadolazeći',
+                          value: organizerProvider.upcomingEventsCount.toString(),
+                          icon: Icons.schedule,
+                          color: Colors.purple,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  Text(
+                    'Moji događaji',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${events.length} ukupno',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: displayedEvents.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.event_busy, color: Colors.grey.shade500, size: 48),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Još nema događaja',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Kreiraj događaj kako bi ovdje vidio statistiku.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Colors.grey.shade600,
+                                ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      itemCount: displayedEvents.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final event = displayedEvents[index];
+                        return _OrganizerEventTile(event: event);
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ProfileStatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _ProfileStatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrganizerEventTile extends StatelessWidget {
+  final EventDto event;
+
+  const _OrganizerEventTile({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    final dateFormat = DateFormat('d. MMM yyyy • HH:mm');
+    final statusColor = _statusColor(event.status, context);
+    final lowestPrice = event.priceTiers.isNotEmpty
+        ? event.priceTiers.map((tier) => tier.price).reduce((a, b) => a < b ? a : b)
+        : 0.0;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    event.title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    event.status,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    dateFormat.format(event.startsAt),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade700),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(Icons.place_outlined, size: 14, color: Colors.grey.shade600),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '${event.venue}, ${event.city}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _EventSummaryChip(
+                  icon: Icons.confirmation_number_outlined,
+                  label: '${event.totalSold}/${event.totalCapacity} karata',
+                ),
+                _EventSummaryChip(
+                  icon: Icons.attach_money,
+                  label: 'Od ${lowestPrice.toStringAsFixed(2)} BAM',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _statusColor(String status, BuildContext context) {
+    switch (status.toLowerCase()) {
+      case 'published':
+        return Colors.green.shade600;
+      case 'draft':
+        return Colors.orange.shade600;
+      case 'archived':
+        return Colors.red.shade600;
+      default:
+        return Theme.of(context).colorScheme.primary;
+    }
+  }
+}
+
+class _EventSummaryChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _EventSummaryChip({
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: Colors.grey.shade700),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade800,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _UserOrdersList extends StatefulWidget {

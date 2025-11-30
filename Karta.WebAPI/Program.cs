@@ -101,6 +101,7 @@ builder.Services.AddScoped<Karta.Service.Services.IEmailService, Karta.Service.S
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
+builder.Services.AddScoped<IScannerService, ScannerService>();
 
 // Add RabbitMQ services only if enabled
 var useRabbitMQ = builder.Configuration.GetValue<bool>("Email:UseRabbitMQ", false);

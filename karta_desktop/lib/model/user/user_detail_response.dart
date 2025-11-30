@@ -14,6 +14,8 @@ class UserDetailResponse {
   final String lastName;
   @JsonKey(name: 'EmailConfirmed')
   final bool emailConfirmed;
+  @JsonKey(name: 'IsOrganizerVerified')
+  final bool isOrganizerVerified;
   @JsonKey(name: 'CreatedAt')
   final DateTime createdAt;
   @JsonKey(name: 'LastLoginAt')
@@ -27,6 +29,7 @@ class UserDetailResponse {
     required this.firstName,
     required this.lastName,
     required this.emailConfirmed,
+    required this.isOrganizerVerified,
     required this.createdAt,
     this.lastLoginAt,
     required this.roles,

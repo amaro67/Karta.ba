@@ -66,6 +66,7 @@ namespace Karta.WebAPI.Controllers
                 FirstName: user.FirstName ?? string.Empty,
                 LastName: user.LastName ?? string.Empty,
                 EmailConfirmed: user.EmailConfirmed,
+                IsOrganizerVerified: user.IsOrganizerVerified,
                 CreatedAt: user.CreatedAt,
                 LastLoginAt: user.LastLoginAt,
                 Roles: roles.ToArray()
@@ -138,6 +139,62 @@ namespace Karta.WebAPI.Controllers
                 FirstName: user.FirstName ?? string.Empty,
                 LastName: user.LastName ?? string.Empty,
                 EmailConfirmed: user.EmailConfirmed,
+                IsOrganizerVerified: user.IsOrganizerVerified,
+                CreatedAt: user.CreatedAt,
+                LastLoginAt: user.LastLoginAt,
+                Roles: roles.ToArray()
+            );
+
+            return Ok(response);
+        }
+
+        /// <summary>
+        /// Postavlja verifikaciju organizatora
+        /// </summary>
+        [HttpPost("{id}/organizer-verification")]
+        [RequirePermission("ApproveOrganizers")]
+        [SwaggerOperation(
+            Summary = "Verifikuje organizatora",
+            Description = "Admin potvrđuje ili uklanja verifikaciju korisnika koji ima Organizer ulogu"
+        )]
+        [SwaggerResponse(200, "Verifikacija uspješno ažurirana", typeof(UserDetailResponse))]
+        [SwaggerResponse(400, "Korisnik nije organizator")]
+        [SwaggerResponse(401, "Neautorizovan pristup")]
+        [SwaggerResponse(403, "Nedovoljna prava")]
+        [SwaggerResponse(404, "Korisnik nije pronađen")]
+        public async Task<ActionResult<UserDetailResponse>> SetOrganizerVerification(
+            string id,
+            [FromBody] OrganizerVerificationRequest request)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                _logger.LogWarning("User not found for verification: {UserId}", id);
+                return NotFound(new { message = "Korisnik nije pronađen" });
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!roles.Contains("Organizer"))
+            {
+                return BadRequest(new { message = "Korisnik nema Organizer rolu" });
+            }
+
+            user.IsOrganizerVerified = request.IsVerified;
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                _logger.LogError("Failed to update organizer verification for {UserId}: {Errors}",
+                    id, string.Join(", ", result.Errors.Select(e => e.Description)));
+                return BadRequest(new { message = "Greška pri ažuriranju verifikacije", errors = result.Errors });
+            }
+
+            var response = new UserDetailResponse(
+                Id: user.Id,
+                Email: user.Email ?? string.Empty,
+                FirstName: user.FirstName ?? string.Empty,
+                LastName: user.LastName ?? string.Empty,
+                EmailConfirmed: user.EmailConfirmed,
+                IsOrganizerVerified: user.IsOrganizerVerified,
                 CreatedAt: user.CreatedAt,
                 LastLoginAt: user.LastLoginAt,
                 Roles: roles.ToArray()
@@ -314,6 +371,7 @@ namespace Karta.WebAPI.Controllers
                 FirstName: user.FirstName ?? string.Empty,
                 LastName: user.LastName ?? string.Empty,
                 EmailConfirmed: user.EmailConfirmed,
+                IsOrganizerVerified: user.IsOrganizerVerified,
                 CreatedAt: user.CreatedAt,
                 LastLoginAt: user.LastLoginAt,
                 Roles: roles.ToArray()

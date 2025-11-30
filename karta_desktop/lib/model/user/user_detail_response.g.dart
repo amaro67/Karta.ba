@@ -13,6 +13,7 @@ UserDetailResponse _$UserDetailResponseFromJson(Map<String, dynamic> json) =>
       firstName: json['FirstName'] as String,
       lastName: json['LastName'] as String,
       emailConfirmed: json['EmailConfirmed'] as bool,
+      isOrganizerVerified: json['IsOrganizerVerified'] as bool? ?? false,
       createdAt: DateTime.parse(json['CreatedAt'] as String),
       lastLoginAt: json['LastLoginAt'] == null
           ? null
@@ -27,6 +28,7 @@ Map<String, dynamic> _$UserDetailResponseToJson(UserDetailResponse instance) =>
       'FirstName': instance.firstName,
       'LastName': instance.lastName,
       'EmailConfirmed': instance.emailConfirmed,
+      'IsOrganizerVerified': instance.isOrganizerVerified,
       'CreatedAt': instance.createdAt.toIso8601String(),
       'LastLoginAt': instance.lastLoginAt?.toIso8601String(),
       'Roles': instance.roles,

@@ -115,6 +115,12 @@ namespace Karta.WebAPI.Controllers
             var result = await _userManager.AddToRoleAsync(user, request.RoleName);
             if (result.Succeeded)
             {
+                if (request.RoleName == "Organizer" && !user.IsOrganizerVerified)
+                {
+                    user.IsOrganizerVerified = false;
+                    await _userManager.UpdateAsync(user);
+                }
+
                 return Ok(new { message = $"Rola '{request.RoleName}' je uspješno dodjeljena korisniku '{user.Email}'" });
             }
 
@@ -147,6 +153,12 @@ namespace Karta.WebAPI.Controllers
             var result = await _userManager.RemoveFromRolesAsync(user, await _userManager.GetRolesAsync(user));
             if (result.Succeeded)
             {
+                if (user.IsOrganizerVerified)
+                {
+                    user.IsOrganizerVerified = false;
+                    await _userManager.UpdateAsync(user);
+                }
+
                 return Ok(new { message = $"Sve role su uklonjene od korisnika '{user.Email}'" });
             }
 
@@ -177,6 +189,7 @@ namespace Karta.WebAPI.Controllers
                     FirstName = user.FirstName,
                     LastName = user.LastName,
                     EmailConfirmed = user.EmailConfirmed,
+                    IsOrganizerVerified = user.IsOrganizerVerified,
                     CreatedAt = user.CreatedAt,
                     Roles = roles
                 });

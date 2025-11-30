@@ -47,6 +47,7 @@ namespace Karta.Service.Services
                 new("firstName", user.FirstName ?? ""),
                 new("lastName", user.LastName ?? ""),
                 new("emailConfirmed", user.EmailConfirmed.ToString()),
+                new("isOrganizerVerified", user.IsOrganizerVerified.ToString()),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
             };

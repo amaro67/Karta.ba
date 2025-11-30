@@ -13,6 +13,7 @@ public interface IOrderService
     Task<OrderDto?> GetOrderByIdAsync(Guid id, CancellationToken ct = default);
     Task<IReadOnlyList<OrderDto>> GetMyOrdersAsync(string userId, CancellationToken ct = default);
     Task<PagedResult<OrderDto>> GetAllOrdersAsync(string? query, string? userId, string? status, DateTimeOffset? from, DateTimeOffset? to, int page, int size, CancellationToken ct = default);
+    Task<IReadOnlyList<OrganizerOrderDto>> GetOrganizerOrdersAsync(string organizerId, CancellationToken ct = default);
     Task HandleStripeWebhookAsync(string json, string? signature, CancellationToken ct = default);
     Task ClearAllOrdersAsync(CancellationToken ct = default);
 }
