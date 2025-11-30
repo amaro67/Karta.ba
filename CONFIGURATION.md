@@ -18,9 +18,9 @@
 ```json
 {
   "Stripe": {
-    "SecretKey": "sk_test_51S1vuqRtea3eAVbDVW0BFpjvosISi4fUmyQyxt0X4qFDhBYGl0saiE9vvE0ai3PLLNXSP9uwyyt508q1Rsue1h2V00rM0ev1Yo",
-    "PublishableKey": "pk_test_51S1vuqRtea3eAVbD0w930SERvYaN3agPwsDCxH0Dl5sCe5fxUPcujcWSL4LZDyNNG3eADETOL5DhdxSEqXvuwnHJ00RuqVEpYt",
-    "WebhookSecret": "whsec_92dc394f4902bf59628d8552c6962252d5ae9fb1dadf2612ac3f02adcdd8eb14"
+    "SecretKey": "sk_test_your_stripe_secret_key_here",
+    "PublishableKey": "pk_test_your_stripe_publishable_key_here",
+    "WebhookSecret": "whsec_your_webhook_secret_here"
   }
 }
 ```
@@ -83,9 +83,9 @@
 Umjesto hardkodiranja u appsettings.json, koristite environment variables:
 
 ```bash
-export Stripe__SecretKey="sk_test_51S1vuqRtea3eAVbDVW0BFpjvosISi4fUmyQyxt0X4qFDhBYGl0saiE9vvE0ai3PLLNXSP9uwyyt508q1Rsue1h2V00rM0ev1Yo"
-export Stripe__PublishableKey="pk_test_51S1vuqRtea3eAVbD0w930SERvYaN3agPwsDCxH0Dl5sCe5fxUPcujcWSL4LZDyNNG3eADETOL5DhdxSEqXvuwnHJ00RuqVEpYt"
-export Stripe__WebhookSecret="whsec_92dc394f4902bf59628d8552c6962252d5ae9fb1dadf2612ac3f02adcdd8eb14"
+export Stripe__SecretKey="sk_test_your_stripe_secret_key_here"
+export Stripe__PublishableKey="pk_test_your_stripe_publishable_key_here"
+export Stripe__WebhookSecret="whsec_your_webhook_secret_here"
 export Email__SmtpUsername="your_email@gmail.com"
 export Email__SmtpPassword="your_app_password"
 ```
