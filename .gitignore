@@ -12,6 +12,16 @@ env.staging
 !env.example
 !env.production.example
 
+# Sensitive Configuration Files (never commit these)
+appsettings.Development.json
+docker-compose.yml
+docker-compose.override.yml
+
+# Configuration Templates (keep these in version control)
+!appsettings.Development.example.json
+!docker-compose.example.yml
+!docker-compose.production.yml
+
 # Database
 *.db
 *.db-shm
