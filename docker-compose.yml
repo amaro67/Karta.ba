@@ -13,10 +13,11 @@ services:
       - sqlserver_data:/var/opt/mssql
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P KartaPassword2024! -Q 'SELECT 1' || exit 1"]
+      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/1433' || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 60s
     networks:
       - karta-network
 
@@ -47,7 +48,13 @@ services:
       - EMAIL_SMTP_PORT=587
       - EMAIL_SMTP_USERNAME=amar.omerovic0607@gmail.com
       - EMAIL_SMTP_PASSWORD=your_email_app_password_here
-      - EMAIL_USE_RABBITMQ=false
+      - EMAIL_USE_RABBITMQ=${EMAIL_USE_RABBITMQ:-false}
+      
+      # RabbitMQ konfiguracija
+      - RABBITMQ_HOSTNAME=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-guest}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
       
       # Stripe konfiguracija (test keys)
       - STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key_here
@@ -85,15 +92,17 @@ services:
       retries: 3
       start_period: 40s
     
-    # Dependency na SQL Server
+    # Dependency na SQL Server i RabbitMQ
     depends_on:
       sqlserver:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     
     networks:
       - karta-network
 
-  # RabbitMQ servis (opciono - može se isključiti)
+  # RabbitMQ servis
   rabbitmq:
     image: rabbitmq:3-management
     container_name: karta-rabbitmq
@@ -101,13 +110,19 @@ services:
       - "5672:5672"   # AMQP port
       - "15672:15672" # Management UI port
     environment:
-      - RABBITMQ_DEFAULT_USER=guest
-      - RABBITMQ_DEFAULT_PASS=guest
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME:-guest}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-guest}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     restart: unless-stopped
-    profiles:
-      - rabbitmq  # Može se pokrenuti sa --profile rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - karta-network
 
 # Volumes za persistenciju podataka
 volumes:

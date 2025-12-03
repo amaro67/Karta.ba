@@ -25,7 +25,7 @@ namespace Karta.Service.Services
             var tickets = await _context.Tickets
                 .Include(t => t.OrderItem)
                     .ThenInclude(oi => oi.Order)
-                .Where(t => t.OrderItem.Order.UserId == userId)
+                .Where(t => t.OrderItem.Order.UserId == userId && t.OrderItem.Order.Status == "Paid")
                 .OrderByDescending(t => t.IssuedAt)
                 .ToListAsync(ct);
 

@@ -120,6 +120,39 @@ namespace Karta.Service.Services
             return grouped;
         }
 
+        public async Task<IReadOnlyList<EventScannerSummaryDto>> GetScannerEventsAsync(string scannerUserId, CancellationToken ct = default)
+        {
+            var assignments = await _dbContext.EventScannerAssignments
+                .Where(a => a.ScannerUserId == scannerUserId)
+                .Include(a => a.Event)
+                .Include(a => a.Scanner)
+                .ToListAsync(ct);
+
+            var events = assignments.Select(a => a.Event).Distinct().ToList();
+
+            var result = events.Select(ev =>
+            {
+                var scanners = assignments
+                    .Where(a => a.EventId == ev.Id)
+                    .Select(a => new ScannerUserDto(
+                        a.ScannerUserId,
+                        a.Scanner.Email ?? string.Empty,
+                        a.Scanner.FirstName ?? string.Empty,
+                        a.Scanner.LastName ?? string.Empty))
+                    .ToList();
+
+                return new EventScannerSummaryDto(
+                    ev.Id,
+                    ev.Title,
+                    ev.StartsAt,
+                    ev.EndsAt,
+                    ev.City,
+                    scanners);
+            }).ToList();
+
+            return result;
+        }
+
         public async Task AssignScannerToEventAsync(AssignScannerRequest request, string organizerId, CancellationToken ct = default)
         {
             var eventEntity = await _dbContext.Events.FirstOrDefaultAsync(e => e.Id == request.EventId, ct);

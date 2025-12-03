@@ -274,6 +274,46 @@ namespace Karta.WebAPI.Controllers
         }
 
         /// <summary>
+        /// Vraća listu organizatora koji čekaju verifikaciju
+        /// </summary>
+        [HttpGet("unverified-organizers")]
+        [RequirePermission("ApproveOrganizers")]
+        [SwaggerOperation(
+            Summary = "Vraća neverifikovane organizatore",
+            Description = "Vraća listu organizatora koji imaju Organizer rolu ali nisu verifikovani"
+        )]
+        [SwaggerResponse(200, "Lista neverifikovanih organizatora")]
+        [SwaggerResponse(401, "Neautorizovan pristup")]
+        [SwaggerResponse(403, "Nedovoljna prava")]
+        public async Task<ActionResult<IEnumerable<object>>> GetUnverifiedOrganizers()
+        {
+            var allUsers = _userManager.Users.ToList();
+            var unverifiedOrganizers = new List<object>();
+
+            foreach (var user in allUsers)
+            {
+                var roles = await _userManager.GetRolesAsync(user);
+                if (roles.Contains("Organizer") && !user.IsOrganizerVerified)
+                {
+                    unverifiedOrganizers.Add(new
+                    {
+                        Id = user.Id,
+                        Email = user.Email,
+                        FirstName = user.FirstName,
+                        LastName = user.LastName,
+                        EmailConfirmed = user.EmailConfirmed,
+                        IsOrganizerVerified = user.IsOrganizerVerified,
+                        CreatedAt = user.CreatedAt,
+                        Roles = roles
+                    });
+                }
+            }
+
+            _logger.LogInformation("Retrieved {Count} unverified organizers", unverifiedOrganizers.Count);
+            return Ok(unverifiedOrganizers);
+        }
+
+        /// <summary>
         /// Kreira novog korisnika (samo Admin)
         /// </summary>
         [HttpPost]

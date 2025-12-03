@@ -27,15 +27,7 @@ namespace Karta.Service.Services
                 .Include(e => e.PriceTiers)
                 .AsQueryable();
 
-            // Apply filters
-            if (!string.IsNullOrEmpty(query))
-            {
-                eventsQuery = eventsQuery.Where(e => 
-                    e.Title.Contains(query) || 
-                    e.Description!.Contains(query) ||
-                    e.Venue.Contains(query));
-            }
-
+            // Apply non-string filters first (these work fine with SQLite)
             if (!string.IsNullOrEmpty(category))
             {
                 eventsQuery = eventsQuery.Where(e => e.Category == category);
@@ -59,9 +51,7 @@ namespace Karta.Service.Services
             // Show published and draft events (exclude only archived)
             eventsQuery = eventsQuery.Where(e => e.Status != "Archived");
 
-            var total = await eventsQuery.CountAsync(ct);
-
-            // Load events into memory first, then sort by DateTime (SQLite limitation)
+            // Load events into memory first for case-insensitive search (SQLite limitation)
             var eventsList = await eventsQuery
                 .Select(e => new EventDto(
                     e.Id,
@@ -88,6 +78,18 @@ namespace Karta.Service.Services
                     )).ToList()
                 ))
                 .ToListAsync(ct);
+
+            // Apply case-insensitive search filter in memory
+            if (!string.IsNullOrEmpty(query))
+            {
+                var queryLower = query.ToLower();
+                eventsList = eventsList.Where(e => 
+                    e.Title.ToLower().Contains(queryLower) || 
+                    (e.Description != null && e.Description.ToLower().Contains(queryLower)) ||
+                    e.Venue.ToLower().Contains(queryLower)).ToList();
+            }
+
+            var total = eventsList.Count;
 
             // Sort by DateTime in memory (SQLite limitation)
             var sortedEvents = eventsList

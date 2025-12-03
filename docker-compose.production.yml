@@ -15,10 +15,11 @@ services:
       - sqlserver_data:/var/opt/mssql
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${SQLSERVER_SA_PASSWORD} -Q 'SELECT 1' || exit 1"]
+      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/1433' || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 60s
     networks:
       - karta-network-prod
     deploy:
@@ -56,7 +57,13 @@ services:
       - EMAIL_SMTP_PORT=${EMAIL_SMTP_PORT}
       - EMAIL_SMTP_USERNAME=${EMAIL_SMTP_USERNAME}
       - EMAIL_SMTP_PASSWORD=${EMAIL_SMTP_PASSWORD}
-      - EMAIL_USE_RABBITMQ=false
+      - EMAIL_USE_RABBITMQ=${EMAIL_USE_RABBITMQ:-false}
+      
+      # RabbitMQ konfiguracija
+      - RABBITMQ_HOSTNAME=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-guest}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
       
       # Stripe konfiguracija - PROMENITE OVE VREDNOSTI!
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
@@ -94,15 +101,45 @@ services:
       retries: 3
       start_period: 40s
     
-    # Dependency na SQL Server
+    # Dependency na SQL Server i RabbitMQ
     depends_on:
       sqlserver:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     
     networks:
       - karta-network-prod
     
     # Resource limits za production
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # RabbitMQ servis
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: karta-rabbitmq-prod
+    ports:
+      - "5672:5672"   # AMQP port
+      - "15672:15672" # Management UI port
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME:-guest}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    restart: always
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - karta-network-prod
     deploy:
       resources:
         limits:

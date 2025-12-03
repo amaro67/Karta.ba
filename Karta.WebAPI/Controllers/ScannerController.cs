@@ -66,6 +66,31 @@ namespace Karta.WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpGet("my-events")]
+        public async Task<IActionResult> GetMyEvents()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!roles.Contains("Scanner"))
+            {
+                return Forbid();
+            }
+
+            var result = await _scannerService.GetScannerEventsAsync(userId);
+            return Ok(result);
+        }
+
         [HttpGet("users")]
         public async Task<IActionResult> GetScannerUsers()
         {

@@ -133,7 +133,9 @@ builder.Services.AddRateLimiter(options =>
 });
 
 // Add background services
+builder.Services.AddHostedService<Karta.WebAPI.Services.DatabaseInitializationService>();
 builder.Services.AddHostedService<Karta.WebAPI.Services.OrderCleanupService>();
+builder.Services.AddHostedService<Karta.WebAPI.Services.EventArchiveService>();
 
 // Add EmailConsumerService only if RabbitMQ is enabled
 if (useRabbitMQ)
@@ -300,18 +302,8 @@ app.MapControllers();
 // Add a simple root endpoint for testing
 app.MapGet("/", () => "Karta.ba API is running! Visit /swagger for API documentation.");
 
-// Initialize database and roles
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    context.Database.EnsureCreated();
-    
-    // Initialize core roles
-    await RoleManagementService.InitializeCoreRoles(scope.ServiceProvider);
-    
-    // Seed admin user
-    await SeedDataService.SeedAdminUser(scope.ServiceProvider);
-}
+// Database initialization is now handled by DatabaseInitializationService in the background
+// This allows the application to start immediately without waiting for database operations
 
 try
 {

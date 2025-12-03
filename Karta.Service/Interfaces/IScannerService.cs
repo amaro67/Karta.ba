@@ -11,6 +11,7 @@ namespace Karta.Service.Interfaces
         Task<ScannerUserDto> CreateScannerAsync(CreateScannerUserRequest request, string organizerId, CancellationToken ct = default);
         Task<IReadOnlyList<ScannerUserDto>> GetOrganizerScannersAsync(string organizerId, CancellationToken ct = default);
         Task<IReadOnlyList<EventScannerSummaryDto>> GetOrganizerEventScannersAsync(string organizerId, CancellationToken ct = default);
+        Task<IReadOnlyList<EventScannerSummaryDto>> GetScannerEventsAsync(string scannerUserId, CancellationToken ct = default);
         Task AssignScannerToEventAsync(AssignScannerRequest request, string organizerId, CancellationToken ct = default);
         Task RemoveScannerFromEventAsync(AssignScannerRequest request, string organizerId, CancellationToken ct = default);
     }

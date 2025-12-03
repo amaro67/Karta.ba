@@ -141,6 +141,7 @@ namespace Karta.Service.Services
 
             // Calculate total amount and validate availability
             decimal totalAmount = 0;
+            int totalQuantity = 0;
             var lineItems = new List<SessionLineItemOptions>();
 
             foreach (var item in req.Items)
@@ -154,6 +155,7 @@ namespace Karta.Service.Services
 
                 var itemTotal = priceTier.Price * item.Quantity;
                 totalAmount += itemTotal;
+                totalQuantity += item.Quantity;
 
                 lineItems.Add(new SessionLineItemOptions
                 {
@@ -175,6 +177,31 @@ namespace Karta.Service.Services
                     Quantity = item.Quantity
                 });
             }
+
+            // Add commission fee (0.50 per ticket)
+            const decimal commissionFeePerTicket = 0.50m;
+            decimal commissionFee = commissionFeePerTicket * totalQuantity;
+            totalAmount += commissionFee;
+
+            // Add commission fee as a line item
+            lineItems.Add(new SessionLineItemOptions
+            {
+                PriceData = new SessionLineItemPriceDataOptions
+                {
+                    UnitAmount = (long)Math.Round(commissionFeePerTicket * 100m, MidpointRounding.AwayFromZero),
+                    Currency = req.Currency.ToLowerInvariant(),
+                    ProductData = new SessionLineItemPriceDataProductDataOptions
+                    {
+                        Name = "Commission Fee",
+                        Description = $"Service fee per ticket",
+                        Metadata = new Dictionary<string, string>
+                        {
+                            { "type", "commission" }
+                        }
+                    }
+                },
+                Quantity = totalQuantity
+            });
 
             // Create order with Pending status
             var order = new Order
@@ -364,8 +391,41 @@ namespace Karta.Service.Services
                 _logger.LogWarning("Session {SessionId} has no PaymentIntentId. Will be set by payment_intent.succeeded handler.", session.Id);
             }
 
+            // Reserve stock now that payment is successful
+            foreach (var orderItem in order.Items)
+            {
+                var priceTier = await _context.PriceTiers.FindAsync(orderItem.PriceTierId);
+                if (priceTier != null)
+                {
+                    priceTier.Sold += orderItem.Qty;
+                    _logger.LogInformation("Updated Sold count for PriceTier {PriceTierId}: {Sold} (was {PreviousSold}, added {Qty})", 
+                        priceTier.Id, priceTier.Sold, priceTier.Sold - orderItem.Qty, orderItem.Qty);
+                }
+            }
+
+            // Generate tickets for each order item
+            foreach (var orderItem in order.Items)
+            {
+                for (int i = 0; i < orderItem.Qty; i++)
+                {
+                    var ticket = new Ticket
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderItemId = orderItem.Id,
+                        TicketCode = GenerateTicketCode(),
+                        Status = "Valid",
+                        IssuedAt = DateTime.UtcNow,
+                        QRNonce = Guid.NewGuid().ToString("N")[..32]
+                    };
+                    _context.Tickets.Add(ticket);
+                }
+            }
+
             // Save changes
             await _context.SaveChangesAsync(ct);
+
+            // Send ticket confirmation emails
+            await SendTicketConfirmationEmails(order, ct);
 
             _logger.LogInformation("Order {OrderId} marked as Paid via CheckoutSession. PaymentIntentId: {PaymentIntentId}", 
                 order.Id, order.StripePaymentIntentId ?? "null");
