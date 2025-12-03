@@ -27,7 +27,7 @@ class EventProvider extends ChangeNotifier {
   DateTime? _fromDate;
   DateTime? _toDate;
   int _currentPage = 1;
-  int _pageSize = 20;
+  final int _pageSize = 20;
 
   // Getters
   PagedResult<EventDto>? get events => _events;

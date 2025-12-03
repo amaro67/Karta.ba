@@ -12,6 +12,8 @@ import 'screens/auth/login_screen.dart';
 import 'screens/admin/user_detail_screen.dart';
 import 'widgets/admin_layout.dart';
 import 'widgets/organizer_layout.dart';
+import 'widgets/karta_logo.dart';
+import 'config/theme.dart';
 
 void main() {
   runApp(const KartaDesktopApp());
@@ -73,34 +75,7 @@ class KartaDesktopApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Karta Desktop',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF3B82F6),
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-          appBarTheme: const AppBarTheme(
-            centerTitle: true,
-            elevation: 0,
-          ),
-          cardTheme: CardThemeData(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 12,
-              ),
-            ),
-          ),
-        ),
+        theme: AppTheme.lightTheme,
         home: const AppWrapper(),
       ),
     );
@@ -278,12 +253,12 @@ class _MainAppState extends State<MainApp> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.dashboard,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.primary,
+                const KartaLogo(
+                  fontSize: 48,
+                  fontWeight: FontWeight.bold,
+                  showIcon: true,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 Text(
                   'Welcome to Karta Desktop!',
                   style: Theme.of(context).textTheme.headlineMedium,

@@ -277,6 +277,8 @@ class AdminProvider extends ChangeNotifier {
       await ApiClient.setOrganizerVerification(token, userId, isVerified);
       _usersError = null;
       await loadUsers();
+      // Refresh unverified organizers list after verification change
+      await loadUnverifiedOrganizers();
 
       if (_authProvider.currentUser?.id == userId) {
         await _authProvider.refreshCurrentUser();
@@ -380,6 +382,41 @@ class AdminProvider extends ChangeNotifier {
     }
   }
 
+  // Unverified Organizers
+  List<dynamic> _unverifiedOrganizers = [];
+  bool _isLoadingUnverifiedOrganizers = false;
+  String? _unverifiedOrganizersError;
+
+  List<dynamic> get unverifiedOrganizers => _unverifiedOrganizers;
+  bool get isLoadingUnverifiedOrganizers => _isLoadingUnverifiedOrganizers;
+  String? get unverifiedOrganizersError => _unverifiedOrganizersError;
+  int get unverifiedOrganizersCount => _unverifiedOrganizers.length;
+
+  /// Load unverified organizers
+  Future<void> loadUnverifiedOrganizers() async {
+    final token = _authProvider.accessToken;
+    if (token == null) {
+      _unverifiedOrganizersError = 'Not authenticated';
+      notifyListeners();
+      return;
+    }
+
+    _isLoadingUnverifiedOrganizers = true;
+    _unverifiedOrganizersError = null;
+    notifyListeners();
+
+    try {
+      _unverifiedOrganizers = await ApiClient.getUnverifiedOrganizers(token);
+      _unverifiedOrganizersError = null;
+    } catch (e) {
+      _unverifiedOrganizersError = e.toString();
+      _unverifiedOrganizers = [];
+    } finally {
+      _isLoadingUnverifiedOrganizers = false;
+      notifyListeners();
+    }
+  }
+
   /// Clear all data
   void clear() {
     _loadUsersFuture = null;
@@ -392,6 +429,8 @@ class AdminProvider extends ChangeNotifier {
     _createUserError = null;
     _userOrders = [];
     _userOrdersError = null;
+    _unverifiedOrganizers = [];
+    _unverifiedOrganizersError = null;
     notifyListeners();
   }
 }

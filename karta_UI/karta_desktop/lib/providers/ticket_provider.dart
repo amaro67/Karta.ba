@@ -24,7 +24,7 @@ class TicketProvider extends ChangeNotifier {
   DateTime? _fromDate;
   DateTime? _toDate;
   int _currentPage = 1;
-  int _pageSize = 20;
+  final int _pageSize = 20;
 
   PagedResult<TicketDto>? get tickets => _tickets;
   bool get isLoading => _isLoading;

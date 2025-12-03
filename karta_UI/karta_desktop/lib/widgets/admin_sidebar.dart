@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'karta_logo.dart';
 
 class AdminSidebar extends StatelessWidget {
   final int selectedIndex;
@@ -28,30 +29,9 @@ class AdminSidebar extends StatelessWidget {
           // Logo/Header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.confirmation_number,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'karta.ba',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade900,
-                        fontSize: 20,
-                      ),
-                ),
-              ],
+            child: const KartaLogo(
+              fontSize: 20,
+              showIcon: true,
             ),
           ),
           

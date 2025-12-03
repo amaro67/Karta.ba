@@ -444,7 +444,7 @@ class _FilterDialogState extends State<_FilterDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<String>(
-              value: _selectedStatus,
+              initialValue: _selectedStatus,
               decoration: const InputDecoration(
                 labelText: 'Status',
                 border: OutlineInputBorder(),

@@ -556,7 +556,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               DropdownButtonFormField<String>(
-                                value: _status,
+                                initialValue: _status,
                                 decoration: InputDecoration(
                                   labelText: 'Status',
                                   border: OutlineInputBorder(
@@ -832,7 +832,7 @@ class _TicketOptionCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
-                      value: option.currency,
+                      initialValue: option.currency,
                       items: currencies
                           .map(
                             (currency) => DropdownMenuItem(

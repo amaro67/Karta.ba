@@ -4,6 +4,8 @@ import '../../providers/auth_provider.dart';
 import '../../utils/base_textfield.dart';
 import '../../utils/error_dialog.dart';
 import '../../widgets/loading_widget.dart';
+import '../../config/theme.dart';
+import '../../widgets/karta_logo.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -79,13 +81,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF1E3A8A),
-              Color(0xFF3B82F6),
-              Color(0xFF60A5FA),
+              AppTheme.primaryDark,
+              AppTheme.primaryColor,
+              AppTheme.primaryLight,
             ],
           ),
         ),
@@ -107,18 +109,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         // Logo
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
-                            borderRadius: BorderRadius.circular(40),
-                          ),
-                          child: Icon(
-                            Icons.confirmation_number,
-                            size: 40,
-                            color: Theme.of(context).colorScheme.onPrimary,
-                          ),
+                        const KartaLogo(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          showIcon: true,
                         ),
                         const SizedBox(height: 24),
                         

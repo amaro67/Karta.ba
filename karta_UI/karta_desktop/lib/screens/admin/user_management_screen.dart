@@ -15,7 +15,7 @@ class UserManagementScreen extends StatefulWidget {
 class _UserManagementScreenState extends State<UserManagementScreen> {
   final TextEditingController _searchController = TextEditingController();
   String? _selectedRoleFilter;
-  List<String> _availableRoles = ['User', 'Organizer', 'Scanner', 'Admin'];
+  final List<String> _availableRoles = ['User', 'Organizer', 'Scanner', 'Admin'];
 
   @override
   void initState() {
@@ -211,7 +211,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               ],
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -470,8 +470,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                                             headingRowHeight: 56,
                                             dataRowMinHeight: 56,
                                             dataRowMaxHeight: 72,
-                                            headingRowColor: MaterialStateProperty.all(
-                                              Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                                            headingRowColor: WidgetStateProperty.all(
+                                              Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
                                             ),
                                       columns: const [
                                         DataColumn(
@@ -690,7 +690,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           ),
         ],
       ),
-      backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
     );
   }
 
@@ -786,7 +786,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: selectedRole,
+                    initialValue: selectedRole,
                     decoration: const InputDecoration(
                       labelText: 'Rola',
                       border: OutlineInputBorder(),
@@ -1048,7 +1048,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                         );
                       },
                     );
-                  }).toList(),
+                  }),
                 ],
               ),
             ),
@@ -1175,7 +1175,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(

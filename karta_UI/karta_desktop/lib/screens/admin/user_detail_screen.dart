@@ -595,7 +595,7 @@ class _TicketHeader extends StatelessWidget {
 class _PerforatedDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       height: 20,
       child: CustomPaint(
@@ -985,7 +985,7 @@ class _PerforationPainter extends CustomPainter {
 }
 
 class _OrganizerProfileStatsPanel extends StatefulWidget {
-  const _OrganizerProfileStatsPanel({super.key});
+  const _OrganizerProfileStatsPanel();
 
   @override
   State<_OrganizerProfileStatsPanel> createState() => _OrganizerProfileStatsPanelState();

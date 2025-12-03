@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/admin_provider.dart';
+import '../../config/theme.dart';
 import 'event_detail_screen.dart';
 import 'user_detail_screen.dart';
 import 'user_management_screen.dart';
@@ -176,7 +177,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   value: _formatCurrency(
                                     adminProvider.dashboardStats?['totalRevenue'] ?? 0.0,
                                   ),
-                                  color: Colors.green,
+                                  color: AppTheme.primaryColor,
                                   onTap: () {
                                     // Navigate to orders/sales
                                     Navigator.of(context).push(
@@ -193,7 +194,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   icon: Icons.event,
                                   title: 'Events',
                                   value: '${adminProvider.dashboardStats?['numberOfEvents'] ?? 0}',
-                                  color: Colors.blue,
+                                  color: AppTheme.primaryColor,
                                   onTap: () {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
@@ -209,7 +210,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   icon: Icons.people,
                                   title: 'Users',
                                   value: '${adminProvider.dashboardStats?['totalUsersRegistered'] ?? 0}',
-                                  color: Colors.orange,
+                                  color: AppTheme.primaryColor,
                                   onTap: () {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
@@ -227,7 +228,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   value: _formatCurrency(
                                     adminProvider.dashboardStats?['kartaBaProfit'] ?? 0.0,
                                   ),
-                                  color: Colors.purple,
+                                  color: AppTheme.primaryColor,
                                   onTap: () {
                                     // Show profit details
                                   },

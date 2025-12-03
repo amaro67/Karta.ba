@@ -116,7 +116,7 @@ class AuthProvider extends ChangeNotifier {
       await _clearAuthData();
     } finally {
       _setLoading(false);
-      print('🔵 AuthProvider: Initialization complete. Authenticated: ${isAuthenticated}');
+      print('🔵 AuthProvider: Initialization complete. Authenticated: $isAuthenticated');
     }
   }
 

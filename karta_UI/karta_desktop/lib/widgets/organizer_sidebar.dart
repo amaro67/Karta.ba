@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'karta_logo.dart';
 
 class OrganizerSidebar extends StatelessWidget {
   final int selectedIndex;
@@ -34,28 +35,9 @@ class OrganizerSidebar extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
             alignment: Alignment.centerLeft,
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.event,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Organizer',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade900,
-                      ),
-                ),
-              ],
+            child: const KartaLogo(
+              fontSize: 18,
+              showIcon: true,
             ),
           ),
           Expanded(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -10,6 +11,7 @@ import '../screens/admin/user_management_screen.dart';
 import '../screens/admin/event_management_screen.dart';
 import '../screens/admin/order_management_screen.dart';
 import '../screens/admin/ticket_management_screen.dart';
+import '../config/theme.dart';
 
 class AdminLayout extends StatefulWidget {
   const AdminLayout({super.key});
@@ -20,6 +22,32 @@ class AdminLayout extends StatefulWidget {
 
 class _AdminLayoutState extends State<AdminLayout> {
   int _selectedIndex = 0;
+  Timer? _notificationTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load unverified organizers when layout is initialized
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+      adminProvider.loadUnverifiedOrganizers();
+      
+      // Refresh periodically (every 30 seconds)
+      _notificationTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+        if (mounted) {
+          adminProvider.loadUnverifiedOrganizers();
+        } else {
+          timer.cancel();
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _notificationTimer?.cancel();
+    super.dispose();
+  }
 
   void _onItemSelected(int index) {
     _navigateToIndex(index);
@@ -105,25 +133,66 @@ class _AdminLayoutState extends State<AdminLayout> {
                           // Right side: Notifications and User
                           Row(
                             children: [
-                              // Notifications
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade50,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: IconButton(
-                                  icon: Icon(
-                                    Icons.notifications_outlined,
-                                    color: Colors.grey.shade700,
-                                    size: 20,
-                                  ),
-                                  onPressed: () {
-                                    // TODO: Show notifications
-                                  },
-                                  tooltip: 'Notifications',
-                                ),
+                              // Notifications with badge
+                              Consumer<AdminProvider>(
+                                builder: (context, adminProvider, child) {
+                                  final count = adminProvider.unverifiedOrganizersCount;
+                                  return Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade50,
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: IconButton(
+                                          icon: Icon(
+                                            Icons.notifications_outlined,
+                                            color: Colors.grey.shade700,
+                                            size: 20,
+                                          ),
+                                          onPressed: () {
+                                            _showNotificationsDialog(context, adminProvider);
+                                          },
+                                          tooltip: 'Notifications',
+                                        ),
+                                      ),
+                                      if (count > 0)
+                                        Positioned(
+                                          right: 0,
+                                          top: 0,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: Colors.white,
+                                                width: 2,
+                                              ),
+                                            ),
+                                            constraints: const BoxConstraints(
+                                              minWidth: 18,
+                                              minHeight: 18,
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                count > 99 ? '99+' : count.toString(),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                },
                               ),
                               const SizedBox(width: 12),
                               // User Profile
@@ -246,6 +315,73 @@ class _AdminLayoutState extends State<AdminLayout> {
           ),
         );
       },
+    );
+  }
+
+  void _showNotificationsDialog(BuildContext context, AdminProvider adminProvider) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.notifications_active, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Neverifikovani organizatori'),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: adminProvider.isLoadingUnverifiedOrganizers
+              ? const Center(child: CircularProgressIndicator())
+              : adminProvider.unverifiedOrganizers.isEmpty
+                  ? const Text('Nema organizatora koji čekaju verifikaciju.')
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: adminProvider.unverifiedOrganizers.length,
+                      itemBuilder: (context, index) {
+                        final organizer = adminProvider.unverifiedOrganizers[index];
+                        final firstName = organizer['firstName'] as String? ?? '';
+                        final lastName = organizer['lastName'] as String? ?? '';
+                        final email = organizer['email'] as String? ?? '';
+                        
+                        return ListTile(
+                          leading: CircleAvatar(
+                            child: Text(
+                              firstName.isNotEmpty
+                                  ? firstName[0].toUpperCase()
+                                  : email.isNotEmpty
+                                      ? email[0].toUpperCase()
+                                      : '?',
+                            ),
+                          ),
+                          title: Text('$firstName $lastName'.trim().isEmpty ? email : '$firstName $lastName'),
+                          subtitle: Text(email),
+                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () {
+                            Navigator.of(dialogContext).pop();
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => UserDetailScreen(
+                                  user: organizer,
+                                  isOwnProfile: false,
+                                ),
+                              ),
+                            ).then((_) {
+                              // Refresh unverified organizers after returning
+                              adminProvider.loadUnverifiedOrganizers();
+                            });
+                          },
+                        );
+                      },
+                    ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Zatvori'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -536,7 +672,7 @@ class _AdminDashboardContentState extends State<AdminDashboardContent> {
             icon: Icons.attach_money,
             title: 'Total Revenue',
             value: _formatCurrency(totalRevenue),
-            color: Colors.green,
+            color: AppTheme.primaryColor,
           ),
         ),
         const SizedBox(width: 16),
@@ -545,7 +681,7 @@ class _AdminDashboardContentState extends State<AdminDashboardContent> {
             icon: Icons.event,
             title: 'Events',
             value: '$numberOfEvents',
-            color: Colors.blue,
+            color: AppTheme.primaryColor,
           ),
         ),
         const SizedBox(width: 16),
@@ -554,7 +690,7 @@ class _AdminDashboardContentState extends State<AdminDashboardContent> {
             icon: Icons.people,
             title: 'Users',
             value: '$totalUsers',
-            color: Colors.orange,
+            color: AppTheme.primaryColor,
           ),
         ),
         const SizedBox(width: 16),
@@ -563,7 +699,7 @@ class _AdminDashboardContentState extends State<AdminDashboardContent> {
             icon: Icons.trending_up,
             title: 'karta.ba Profit',
             value: _formatCurrency(kartaBaProfit),
-            color: Colors.purple,
+            color: AppTheme.primaryColor,
           ),
         ),
       ],

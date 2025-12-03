@@ -729,6 +729,31 @@ class ApiClient {
     }
   }
 
+  /// Get unverified organizers
+  static Future<List<dynamic>> getUnverifiedOrganizers(String token) async {
+    try {
+      final response = await _client.get(
+        Uri.parse('$baseUrl$apiPrefix/User/unverified-organizers'),
+        headers: _getHeaders(token: token),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is List) {
+          return List<dynamic>.from(data);
+        }
+        return [];
+      } else {
+        throw Exception('Failed to load unverified organizers');
+      }
+    } catch (e) {
+      if (e is SocketException) {
+        throw Exception('Unable to connect to server. Please check your connection.');
+      }
+      rethrow;
+    }
+  }
+
   /// Assign role to user (replaces all existing roles with new one)
   static Future<Map<String, dynamic>> assignRole(String token, String userId, String roleName) async {
     return await post('/CoreRole/assign', {

@@ -335,7 +335,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                 ),
                               ],
                             );
-                          }).toList(),
+                          }),
                           if (orderProvider.isLoading)
                             DataRow(
                               cells: List.generate(
@@ -486,7 +486,7 @@ class _FilterDialogState extends State<_FilterDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<String>(
-              value: _status,
+              initialValue: _status,
               decoration: const InputDecoration(
                 labelText: 'Status',
                 border: OutlineInputBorder(),
