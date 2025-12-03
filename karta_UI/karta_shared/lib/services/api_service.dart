@@ -11,13 +11,13 @@ class ApiClient {
   // Automatically detect platform and use correct baseUrl
   static String get baseUrl {
     if (kIsWeb) {
-      return 'http://localhost:5001';
+      return 'http://localhost:8080';
     } else if (Platform.isAndroid) {
       // Android emulator uses 10.0.2.2 to access host machine's localhost
-      return 'http://10.0.2.2:5001';
+      return 'http://10.0.2.2:8080';
     } else {
       // iOS simulator and desktop use localhost
-      return 'http://localhost:5001';
+      return 'http://localhost:8080';
     }
   }
   

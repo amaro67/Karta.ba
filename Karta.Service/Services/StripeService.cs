@@ -249,8 +249,8 @@ namespace Karta.Service.Services
                 {
                     Mode = "payment",
                     LineItems = lineItems,
-                    SuccessUrl = $"http://localhost:5001/api/order/success?session_id={{CHECKOUT_SESSION_ID}}&order_id={order.Id}",
-                    CancelUrl = $"http://localhost:5001/api/order/cancel?order_id={order.Id}",
+                    SuccessUrl = $"http://localhost:8080/api/order/success?session_id={{CHECKOUT_SESSION_ID}}&order_id={order.Id}",
+                    CancelUrl = $"http://localhost:8080/api/order/cancel?order_id={order.Id}",
                     Metadata = new Dictionary<string, string>
                     {
                         ["orderId"] = order.Id.ToString(),

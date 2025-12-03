@@ -135,26 +135,26 @@ Ovaj dokument opisuje implementirane sigurnosne mjere u Karta API aplikaciji, uk
 ### Testiranje javnih endpointa
 ```bash
 # Pregled svih rola (treba raditi bez autorizacije)
-curl -X GET "http://localhost:5001/api/Role"
+curl -X GET "http://localhost:8080/api/Role"
 
 # Pregled svih događaja (treba raditi bez autorizacije)
-curl -X GET "http://localhost:5001/api/Event"
+curl -X GET "http://localhost:8080/api/Event"
 ```
 
 ### Testiranje zaštićenih endpointa
 ```bash
 # Kreiranje role (treba vratiti 401 Unauthorized)
-curl -X POST "http://localhost:5001/api/Role" \
+curl -X POST "http://localhost:8080/api/Role" \
   -H "Content-Type: application/json" \
   -d '{"name":"TestRole","description":"Test role"}'
 
 # Ažuriranje role (treba vratiti 401 Unauthorized)
-curl -X PUT "http://localhost:5001/api/Role" \
+curl -X PUT "http://localhost:8080/api/Role" \
   -H "Content-Type: application/json" \
   -d '{"id":"123","name":"UpdatedRole","description":"Updated role"}'
 
 # Brisanje role (treba vratiti 401 Unauthorized)
-curl -X DELETE "http://localhost:5001/api/Role/123"
+curl -X DELETE "http://localhost:8080/api/Role/123"
 ```
 
 ## Konfiguracija sigurnosti

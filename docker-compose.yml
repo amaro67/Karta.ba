@@ -38,7 +38,7 @@ services:
       - CONNECTION_STRING=Server=sqlserver,1433;Database=KartaDb;User Id=sa;Password=KartaPassword2024!;TrustServerCertificate=true;MultipleActiveResultSets=true;
       
       # JWT konfiguracija
-      - JWT_SECRET_KEY=your_super_secret_jwt_key_here_at_least_32_characters_long_for_docker
+      - JWT_SECRET_KEY=your_super_secret_jwt_key_here_at_least_32_characters_long
       - JWT_EXPIRY_MINUTES=60
       - JWT_REFRESH_TOKEN_EXPIRY_DAYS=7
       

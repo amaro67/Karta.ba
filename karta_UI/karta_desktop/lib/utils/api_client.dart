@@ -7,7 +7,7 @@ import '../model/auth/auth_response.dart';
 import '../model/auth/refresh_token_request.dart';
 
 class ApiClient {
-  static const String baseUrl = 'http://localhost:5001';
+  static const String baseUrl = 'http://localhost:8080';
   static const String apiPrefix = '/api';
   
   static final http.Client _client = http.Client();
@@ -314,10 +314,20 @@ class ApiClient {
   // Generic GET request with authentication
   static Future<Map<String, dynamic>> get(String endpoint, {String? token}) async {
     try {
+      print('🔵 ApiClient.get: $baseUrl$apiPrefix$endpoint');
+      print('🔵 ApiClient.get: Token present: ${token != null}');
+      if (token != null) {
+        print('🔵 ApiClient.get: Token length: ${token.length}');
+        print('🔵 ApiClient.get: Token preview: ${token.substring(0, token.length > 50 ? 50 : token.length)}...');
+      }
+      
       final response = await _client.get(
         Uri.parse('$baseUrl$apiPrefix$endpoint'),
         headers: _getHeaders(token: token),
       );
+
+      print('🔵 ApiClient.get: Response status: ${response.statusCode}');
+      print('🔵 ApiClient.get: Response headers: ${response.headers}');
 
       if (response.statusCode == 200) {
         if (response.body.isEmpty) {
@@ -339,6 +349,18 @@ class ApiClient {
         }
       } else {
         String errorMessage = 'Request failed with status ${response.statusCode}';
+        print('🔴 ApiClient.get: Error response body: ${response.body}');
+        print('🔴 ApiClient.get: Response headers: ${response.headers}');
+        
+        // Special handling for 401 Unauthorized
+        if (response.statusCode == 401) {
+          if (token == null) {
+            errorMessage = 'Not authenticated. Please log in again.';
+          } else {
+            errorMessage = 'Authentication failed. Your session may have expired. Please log in again.';
+          }
+        }
+        
         try {
           if (response.body.isNotEmpty) {
             final errorData = jsonDecode(response.body);
