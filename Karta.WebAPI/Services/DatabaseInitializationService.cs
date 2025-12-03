@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Linq;
 
 namespace Karta.WebAPI.Services
 {
@@ -10,6 +11,8 @@ namespace Karta.WebAPI.Services
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<DatabaseInitializationService> _logger;
+        private const int MaxRetries = 5;
+        private const int InitialDelayMs = 5000; // Increased from 1000ms to 5000ms
 
         public DatabaseInitializationService(
             IServiceProvider serviceProvider,
@@ -23,19 +26,20 @@ namespace Karta.WebAPI.Services
         {
             _logger.LogInformation("Database initialization service starting...");
 
-            // Wait a bit to ensure the application is fully started
-            await Task.Delay(1000, stoppingToken);
+            // Wait longer to ensure SQL Server is fully ready
+            _logger.LogInformation("Waiting {DelayMs}ms for database server to be ready...", InitialDelayMs);
+            await Task.Delay(InitialDelayMs, stoppingToken);
 
             try
             {
                 using var scope = _serviceProvider.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-                // Ensure database exists (this is fast if it already exists)
-                // Using EnsureCreatedAsync which is optimized for SQLite
-                _logger.LogInformation("Ensuring database exists...");
-                await context.Database.EnsureCreatedAsync(stoppingToken);
-                _logger.LogInformation("Database ready.");
+                // Apply migrations with retry logic
+                // MigrateAsync() will automatically create the database if it doesn't exist
+                _logger.LogInformation("Applying database migrations...");
+                await ApplyMigrationsWithRetryAsync(context, stoppingToken);
+                _logger.LogInformation("Database migrations applied successfully.");
 
                 // Initialize core roles
                 _logger.LogInformation("Initializing core roles...");
@@ -47,12 +51,96 @@ namespace Karta.WebAPI.Services
                 await SeedDataService.SeedAdminUser(scope.ServiceProvider);
                 _logger.LogInformation("Admin user seeding completed.");
 
+                // Seed all data (events, orders, tickets, etc.)
+                _logger.LogInformation("Seeding all data...");
+                await SeedDataService.SeedAllData(scope.ServiceProvider);
+                _logger.LogInformation("All data seeding completed.");
+
                 _logger.LogInformation("Database initialization completed successfully.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during database initialization");
+                _logger.LogError(ex, "Error during database initialization: {Message}", ex.Message);
+                _logger.LogError("Stack trace: {StackTrace}", ex.StackTrace);
             }
+        }
+
+        private async Task ApplyMigrationsWithRetryAsync(ApplicationDbContext context, CancellationToken stoppingToken)
+        {
+            int attempt = 0;
+            while (attempt < MaxRetries)
+            {
+                try
+                {
+                    attempt++;
+                    _logger.LogInformation("Attempt {Attempt}/{MaxRetries} to apply database migrations...", attempt, MaxRetries);
+                    
+                    // Try to check if database exists
+                    bool databaseExists = false;
+                    try
+                    {
+                        databaseExists = await context.Database.CanConnectAsync(stoppingToken);
+                        _logger.LogInformation("Database connection check: CanConnect={CanConnect}", databaseExists);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogInformation("Database connection check failed (database may not exist): {Message}", ex.Message);
+                        databaseExists = false;
+                    }
+                    
+                    // If database doesn't exist, MigrateAsync() will create it
+                    // MigrateAsync() automatically creates the database if it doesn't exist
+                    if (!databaseExists)
+                    {
+                        _logger.LogInformation("Database does not exist. MigrateAsync() will create it...");
+                    }
+                    
+                    // Apply migrations - this will create the database if it doesn't exist
+                    await context.Database.MigrateAsync(stoppingToken);
+                    _logger.LogInformation("Database migrations applied successfully on attempt {Attempt}", attempt);
+                    
+                    // Check pending migrations for logging
+                    try
+                    {
+                        var pendingMigrations = await context.Database.GetPendingMigrationsAsync(stoppingToken);
+                        var pendingMigrationsList = pendingMigrations.ToList();
+                        if (pendingMigrationsList.Any())
+                        {
+                            _logger.LogInformation("Applied {Count} migration(s): {Migrations}", 
+                                pendingMigrationsList.Count, string.Join(", ", pendingMigrationsList));
+                        }
+                        else
+                        {
+                            _logger.LogInformation("No pending migrations. Database is up to date.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning("Could not check pending migrations: {Message}", ex.Message);
+                    }
+                    
+                    // Verify database connection after migrations
+                    var canConnectAfter = await context.Database.CanConnectAsync(stoppingToken);
+                    if (canConnectAfter)
+                    {
+                        _logger.LogInformation("Database connection verified after migrations on attempt {Attempt}", attempt);
+                        return;
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Database connection failed after migrations");
+                    }
+                }
+                catch (Exception ex) when (attempt < MaxRetries)
+                {
+                    var delayMs = (int)(InitialDelayMs * Math.Pow(2, attempt - 1)); // Exponential backoff
+                    _logger.LogWarning(ex, "Attempt {Attempt} failed: {Message}. Retrying in {DelayMs}ms...", 
+                        attempt, ex.Message, delayMs);
+                    await Task.Delay(delayMs, stoppingToken);
+                }
+            }
+            
+            throw new InvalidOperationException($"Failed to apply database migrations after {MaxRetries} attempts");
         }
     }
 }

@@ -76,18 +76,13 @@ namespace Karta.WebAPI.Services
             
             _logger.LogDebug("Looking for events that should be archived (current time: {Now})", now);
 
-            // SQLite has issues with DateTimeOffset comparison, so load all non-archived/cancelled events first
-            // then filter in memory
-            var allEvents = await context.Events
-                .Where(e => e.Status != "Archived" && e.Status != "Cancelled")
-                .ToListAsync(cancellationToken);
-
             // Find events that should be archived:
             // - EndsAt has passed (or StartsAt if EndsAt is null)
-            var eventsToArchive = allEvents
-                .Where(e => (e.EndsAt.HasValue && e.EndsAt.Value.DateTime < nowDateTime) || 
-                           (!e.EndsAt.HasValue && e.StartsAt.DateTime < nowDateTime))
-                .ToList();
+            var eventsToArchive = await context.Events
+                .Where(e => e.Status != "Archived" && e.Status != "Cancelled" &&
+                           ((e.EndsAt.HasValue && e.EndsAt.Value < now) || 
+                            (!e.EndsAt.HasValue && e.StartsAt < now)))
+                .ToListAsync(cancellationToken);
 
             if (eventsToArchive.Count == 0)
             {

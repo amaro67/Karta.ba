@@ -1,6 +1,6 @@
 -- Make a user admin by email
--- Usage: sqlite3 KartaDb_Dev.db < make-user-admin.sql
--- Or: sqlite3 KartaDb_Dev.db "INSERT INTO AspNetUserRoles (UserId, RoleId) SELECT u.Id, r.Id FROM AspNetUsers u, AspNetRoles r WHERE u.Email = 'your-email@example.com' AND r.Name = 'Admin';"
+-- Usage: sqlcmd -S localhost,1433 -d KartaDb -U sa -P YourPassword -i make-user-admin.sql
+-- Or connect via SSMS or Azure Data Studio and run this script
 
 -- Example: Make admin@test.com an admin
 -- Uncomment and modify the email below:

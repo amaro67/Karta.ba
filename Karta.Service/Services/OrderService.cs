@@ -158,19 +158,13 @@ namespace Karta.Service.Services
                 else
                 {
                     // Search by user first name, last name, or email (case-insensitive)
-                    // Load users into memory first due to SQLite limitations with ToLower()
-                    var allUsers = await _context.Users
-                        .Select(u => new { u.Id, u.FirstName, u.LastName, u.Email })
-                        .ToListAsync(ct);
-
-                    var queryLower = query.ToLower();
-                    var matchingUserIds = allUsers
+                    var matchingUserIds = await _context.Users
                         .Where(u => 
-                            (u.FirstName != null && u.FirstName.ToLower().Contains(queryLower)) || 
-                            (u.LastName != null && u.LastName.ToLower().Contains(queryLower)) || 
-                            (u.Email != null && u.Email.ToLower().Contains(queryLower)))
+                            (u.FirstName != null && EF.Functions.Like(u.FirstName, $"%{query}%")) || 
+                            (u.LastName != null && EF.Functions.Like(u.LastName, $"%{query}%")) || 
+                            (u.Email != null && EF.Functions.Like(u.Email, $"%{query}%")))
                         .Select(u => u.Id)
-                        .ToList();
+                        .ToListAsync(ct);
 
                     if (matchingUserIds.Any())
                     {
@@ -207,7 +201,7 @@ namespace Karta.Service.Services
 
             var total = await ordersQuery.CountAsync(ct);
 
-            // Load orders into memory first, then sort by DateTime (SQLite limitation)
+            // Get paginated orders
             var ordersList = await ordersQuery
                 .OrderByDescending(o => o.CreatedAt)
                 .Skip((page - 1) * size)

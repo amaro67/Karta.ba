@@ -27,7 +27,7 @@ namespace Karta.Service.Services
                 .Include(e => e.PriceTiers)
                 .AsQueryable();
 
-            // Apply non-string filters first (these work fine with SQLite)
+            // Apply filters
             if (!string.IsNullOrEmpty(category))
             {
                 eventsQuery = eventsQuery.Where(e => e.Category == category);
@@ -51,8 +51,22 @@ namespace Karta.Service.Services
             // Show published and draft events (exclude only archived)
             eventsQuery = eventsQuery.Where(e => e.Status != "Archived");
 
-            // Load events into memory first for case-insensitive search (SQLite limitation)
-            var eventsList = await eventsQuery
+            // Apply case-insensitive search filter
+            if (!string.IsNullOrEmpty(query))
+            {
+                eventsQuery = eventsQuery.Where(e => 
+                    EF.Functions.Like(e.Title, $"%{query}%") || 
+                    (e.Description != null && EF.Functions.Like(e.Description, $"%{query}%")) ||
+                    EF.Functions.Like(e.Venue, $"%{query}%"));
+            }
+
+            var total = await eventsQuery.CountAsync(ct);
+
+            // Get paginated results
+            var sortedEvents = await eventsQuery
+                .OrderBy(e => e.StartsAt)
+                .Skip((page - 1) * size)
+                .Take(size)
                 .Select(e => new EventDto(
                     e.Id,
                     e.Title,
@@ -79,25 +93,6 @@ namespace Karta.Service.Services
                 ))
                 .ToListAsync(ct);
 
-            // Apply case-insensitive search filter in memory
-            if (!string.IsNullOrEmpty(query))
-            {
-                var queryLower = query.ToLower();
-                eventsList = eventsList.Where(e => 
-                    e.Title.ToLower().Contains(queryLower) || 
-                    (e.Description != null && e.Description.ToLower().Contains(queryLower)) ||
-                    e.Venue.ToLower().Contains(queryLower)).ToList();
-            }
-
-            var total = eventsList.Count;
-
-            // Sort by DateTime in memory (SQLite limitation)
-            var sortedEvents = eventsList
-                .OrderBy(e => e.StartsAt.DateTime)
-                .Skip((page - 1) * size)
-                .Take(size)
-                .ToList();
-
             return new PagedResult<EventDto>
             {
                 Items = sortedEvents,
@@ -118,9 +113,9 @@ namespace Karta.Service.Services
             if (!string.IsNullOrEmpty(query))
             {
                 eventsQuery = eventsQuery.Where(e => 
-                    e.Title.Contains(query) || 
-                    e.Description!.Contains(query) ||
-                    e.Venue.Contains(query));
+                    EF.Functions.Like(e.Title, $"%{query}%") || 
+                    (e.Description != null && EF.Functions.Like(e.Description, $"%{query}%")) ||
+                    EF.Functions.Like(e.Venue, $"%{query}%"));
             }
 
             if (!string.IsNullOrEmpty(category))
@@ -152,8 +147,11 @@ namespace Karta.Service.Services
 
             var total = await eventsQuery.CountAsync(ct);
 
-            // Load events into memory first, then sort by DateTime (SQLite limitation)
-            var eventsList = await eventsQuery
+            // Get paginated results
+            var sortedEvents = await eventsQuery
+                .OrderBy(e => e.StartsAt)
+                .Skip((page - 1) * size)
+                .Take(size)
                 .Select(e => new EventDto(
                     e.Id,
                     e.Title,
@@ -179,13 +177,6 @@ namespace Karta.Service.Services
                     )).ToList()
                 ))
                 .ToListAsync(ct);
-
-            // Sort by DateTime in memory (SQLite limitation)
-            var sortedEvents = eventsList
-                .OrderBy(e => e.StartsAt.DateTime)
-                .Skip((page - 1) * size)
-                .Take(size)
-                .ToList();
 
             return new PagedResult<EventDto>
             {

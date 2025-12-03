@@ -48,12 +48,9 @@ namespace Karta.WebAPI.Controllers
             try
             {
                 // Ukupna zarada (samo uspješne narudžbe)
-                // SQLite ne podržava SumAsync direktno, pa učitavamo u memoriju pa računamo
-                var completedOrders = await _context.Orders
+                var totalRevenue = await _context.Orders
                     .Where(o => o.Status == "Completed" || o.Status == "Paid")
-                    .Select(o => o.TotalAmount)
-                    .ToListAsync();
-                var totalRevenue = completedOrders.Sum();
+                    .SumAsync(o => o.TotalAmount);
 
                 // Broj događaja (samo aktivni, ne arhivirani)
                 var numberOfEvents = await _context.Events
@@ -105,19 +102,14 @@ namespace Karta.WebAPI.Controllers
             try
             {
                 var now = DateTimeOffset.UtcNow;
-                var nowDateTime = now.DateTime;
 
-                // SQLite ima problema sa DateTimeOffset comparison, pa učitavamo sve pa filtriramo
-                var allEvents = await _context.Events
+                // Get upcoming events
+                var upcomingEvents = await _context.Events
                     .Include(e => e.PriceTiers)
-                    .Where(e => e.Status != "Archived")
-                    .ToListAsync();
-
-                var upcomingEvents = allEvents
-                    .Where(e => e.StartsAt.DateTime > nowDateTime)
+                    .Where(e => e.Status != "Archived" && e.StartsAt > now)
                     .OrderBy(e => e.StartsAt)
                     .Take(limit)
-                    .ToList();
+                    .ToListAsync();
 
                 var eventsDto = upcomingEvents.Select(e =>
                 {

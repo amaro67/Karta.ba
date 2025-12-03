@@ -64,7 +64,7 @@ nano .env
 
 ```bash
 # Database
-CONNECTION_STRING=Data Source=KartaDb.db
+CONNECTION_STRING=Server=localhost,1433;Database=KartaDb;User Id=sa;Password=YourStrongPassword123!;TrustServerCertificate=true;MultipleActiveResultSets=true;
 
 # Stripe Configuration
 STRIPE_SECRET_KEY=sk_test_51S1vuqRtea3eAVbDVW0BFpjvosISi4fUmyQyxt0X4qFDhBYGl0saiE9vvE0ai3PLLNXSP9uwyyt508q1Rsue1h2V00rM0ev1Yo

@@ -1,4 +1,5 @@
--- Delete all users and related data from SQLite database
+-- Delete all users and related data from SQL Server database
+-- Usage: sqlcmd -S localhost,1433 -d KartaDb -U sa -P YourPassword -i delete-all-users.sql
 -- This script deletes all users, their roles, claims, tokens, and password reset tokens
 
 -- Delete password reset tokens first (foreign key constraint)

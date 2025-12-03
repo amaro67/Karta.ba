@@ -15,8 +15,12 @@ using Serilog;
 using System.Text;
 using System.Threading.RateLimiting;
 using System.Linq;
+using System;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Ensure environment variables are loaded into configuration
+builder.Configuration.AddEnvironmentVariables();
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
@@ -32,19 +36,54 @@ builder.Host.UseSerilog();
 // Add services to the container.
 
 // Add Entity Framework
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-var isSQLServer = connectionString?.Contains("Server=") == true;
+// Prioritize environment variable over appsettings.json
+// Read directly from environment variable first, then from configuration
+var envConnectionString = Environment.GetEnvironmentVariable("CONNECTION_STRING");
+var configConnectionString = builder.Configuration["CONNECTION_STRING"];
+var defaultConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
-if (isSQLServer)
+var connectionString = envConnectionString ?? configConnectionString ?? defaultConnectionString;
+
+// Force use of environment variable if it exists
+if (string.IsNullOrEmpty(envConnectionString))
 {
-    builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseSqlServer(connectionString));
+    // If environment variable is not set, log warning
+    Log.Warning("CONNECTION_STRING environment variable is not set. Using: {Source}", 
+        !string.IsNullOrEmpty(configConnectionString) ? "CONNECTION_STRING from config" : "DefaultConnection from config");
 }
 else
 {
-    builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseSqlite(connectionString));
+    Log.Information("Using CONNECTION_STRING from environment variable");
 }
+
+Log.Information("Connection string sources - Env: {Env}, Config: {Config}, Default: {Default}", 
+    string.IsNullOrEmpty(envConnectionString) ? "NULL" : envConnectionString.Substring(0, Math.Min(50, envConnectionString.Length)) + "...",
+    string.IsNullOrEmpty(configConnectionString) ? "NULL" : (configConnectionString.Length > 50 ? configConnectionString.Substring(0, 50) + "..." : configConnectionString),
+    string.IsNullOrEmpty(defaultConnectionString) ? "NULL" : defaultConnectionString);
+    
+if (string.IsNullOrEmpty(connectionString))
+{
+    throw new InvalidOperationException("CONNECTION_STRING environment variable or configuration is required. Please set a SQL Server connection string.");
+}
+
+// Log connection string info (mask password for security)
+var connectionStringForLogging = connectionString;
+if (!string.IsNullOrEmpty(connectionString) && connectionString.Contains("Password="))
+{
+    var passwordIndex = connectionString.IndexOf("Password=");
+    var passwordEnd = connectionString.IndexOf(";", passwordIndex);
+    if (passwordEnd == -1) passwordEnd = connectionString.Length;
+    connectionStringForLogging = connectionString.Substring(0, passwordIndex + 9) + "***" 
+        + (passwordEnd < connectionString.Length ? connectionString.Substring(passwordEnd) : "");
+}
+    
+Log.Information("Database connection: Type=SQL Server, ConnectionString={ConnectionString}", 
+    connectionStringForLogging ?? "null");
+
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlServer(connectionString, b => b.MigrationsAssembly("Karta.WebAPI")));
+Log.Information("Registered SQL Server database provider with connection string: {ConnectionString}", 
+    connectionStringForLogging ?? "null");
 
 // Add Identity
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>

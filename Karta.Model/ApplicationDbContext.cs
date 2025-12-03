@@ -184,6 +184,20 @@ namespace Karta.Model
                     .HasForeignKey(e => e.OrderId)
                     .OnDelete(DeleteBehavior.Cascade);
 
+                // Event relationship - NoAction to avoid multiple cascade paths
+                // (PriceTier -> Event already has cascade, so OrderItem -> Event must be NoAction)
+                entity.HasOne(e => e.Event)
+                    .WithMany()
+                    .HasForeignKey(e => e.EventId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                // PriceTier relationship - NoAction to avoid multiple cascade paths
+                // (PriceTier -> Event has cascade, OrderItem -> Event also exists, so OrderItem -> PriceTier must be NoAction)
+                entity.HasOne(e => e.PriceTier)
+                    .WithMany()
+                    .HasForeignKey(e => e.PriceTierId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
                 // Indexes
                 entity.HasIndex(e => e.OrderId);
                 entity.HasIndex(e => e.EventId);

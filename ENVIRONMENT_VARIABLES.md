@@ -18,7 +18,7 @@ The application uses environment variables to configure sensitive data and envir
 ### Database Configuration
 | Variable | Description | Example | Required |
 |----------|-------------|---------|----------|
-| `CONNECTION_STRING` | Database connection string | `Data Source=KartaDb_Prod.db` | Yes |
+| `CONNECTION_STRING` | Database connection string | `Server=localhost,1433;Database=KartaDb;User Id=sa;Password=YourPassword;TrustServerCertificate=true;MultipleActiveResultSets=true;` | Yes |
 
 ### Stripe Configuration
 | Variable | Description | Example | Required |
