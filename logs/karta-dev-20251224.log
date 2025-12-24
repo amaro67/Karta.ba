@@ -11419,3 +11419,163 @@ LEFT JOIN (
 ) AS [t] ON [o].[Id] = [t].[OrderId]
 WHERE [o].[Status] = N'Pending' AND [o].[CreatedAt] < DATEADD(minute, CAST(-1.0E0 AS int), GETUTCDATE()) AND [o].[CreatedAt] > DATEADD(hour, CAST(-24.0E0 AS int), GETUTCDATE()) AND ([o].[StripePaymentIntentId] IS NULL OR [o].[StripePaymentIntentId] LIKE N'')
 ORDER BY [o].[Id], [t].[Id] {"EventId":{"Id":20101,"Name":"Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"},"MachineName":"59326a6f5604","ThreadId":79}
+[2025-12-24 15:09:17.740 +00:00 INF] Microsoft.AspNetCore.Hosting.Diagnostics Request starting HTTP/1.1 GET http://localhost:8080/ - null null {"EventId":{"Id":1},"RequestId":"0HNI2UO7JECKF:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKF","MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:09:17.741 +00:00 INF] Microsoft.AspNetCore.Routing.EndpointMiddleware Executing endpoint 'HTTP: GET /' {"EventId":{"Name":"ExecutingEndpoint"},"RequestId":"0HNI2UO7JECKF:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKF","MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:09:17.743 +00:00 INF] Microsoft.AspNetCore.Routing.EndpointMiddleware Executed endpoint 'HTTP: GET /' {"EventId":{"Id":1,"Name":"ExecutedEndpoint"},"RequestId":"0HNI2UO7JECKF:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKF","MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:09:17.744 +00:00 INF] Microsoft.AspNetCore.Hosting.Diagnostics Request finished HTTP/1.1 GET http://localhost:8080/ - 200 null text/plain; charset=utf-8 4.2548ms {"EventId":{"Id":2},"RequestId":"0HNI2UO7JECKF:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKF","MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:09:26.253 +00:00 INF] Microsoft.EntityFrameworkCore.Database.Command Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [o].[Id], [o].[CreatedAt], [o].[Currency], [o].[Status], [o].[StripePaymentIntentId], [o].[TotalAmount], [o].[UserId], [t].[Id], [t].[EventId], [t].[OrderId], [t].[PriceTierId], [t].[Qty], [t].[UnitPrice], [t].[Id0], [t].[Category], [t].[City], [t].[Country], [t].[CoverImageUrl], [t].[CreatedAt], [t].[CreatedBy], [t].[Description], [t].[EndsAt], [t].[Slug], [t].[StartsAt], [t].[Status], [t].[Tags], [t].[Title], [t].[Venue]
+FROM [Orders] AS [o]
+LEFT JOIN (
+    SELECT [o0].[Id], [o0].[EventId], [o0].[OrderId], [o0].[PriceTierId], [o0].[Qty], [o0].[UnitPrice], [e].[Id] AS [Id0], [e].[Category], [e].[City], [e].[Country], [e].[CoverImageUrl], [e].[CreatedAt], [e].[CreatedBy], [e].[Description], [e].[EndsAt], [e].[Slug], [e].[StartsAt], [e].[Status], [e].[Tags], [e].[Title], [e].[Venue]
+    FROM [OrderItems] AS [o0]
+    INNER JOIN [Events] AS [e] ON [o0].[EventId] = [e].[Id]
+) AS [t] ON [o].[Id] = [t].[OrderId]
+WHERE [o].[Status] = N'Pending' AND [o].[CreatedAt] < DATEADD(minute, CAST(-1.0E0 AS int), GETUTCDATE()) AND [o].[CreatedAt] > DATEADD(hour, CAST(-24.0E0 AS int), GETUTCDATE()) AND [o].[StripePaymentIntentId] IS NOT NULL AND [o].[StripePaymentIntentId] NOT LIKE N''
+ORDER BY [o].[Id], [t].[Id] {"EventId":{"Id":20101,"Name":"Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"},"MachineName":"59326a6f5604","ThreadId":77}
+[2025-12-24 15:09:26.255 +00:00 INF] Microsoft.EntityFrameworkCore.Database.Command Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [o].[Id], [o].[CreatedAt], [o].[Currency], [o].[Status], [o].[StripePaymentIntentId], [o].[TotalAmount], [o].[UserId], [t].[Id], [t].[EventId], [t].[OrderId], [t].[PriceTierId], [t].[Qty], [t].[UnitPrice], [t].[Id0], [t].[Category], [t].[City], [t].[Country], [t].[CoverImageUrl], [t].[CreatedAt], [t].[CreatedBy], [t].[Description], [t].[EndsAt], [t].[Slug], [t].[StartsAt], [t].[Status], [t].[Tags], [t].[Title], [t].[Venue]
+FROM [Orders] AS [o]
+LEFT JOIN (
+    SELECT [o0].[Id], [o0].[EventId], [o0].[OrderId], [o0].[PriceTierId], [o0].[Qty], [o0].[UnitPrice], [e].[Id] AS [Id0], [e].[Category], [e].[City], [e].[Country], [e].[CoverImageUrl], [e].[CreatedAt], [e].[CreatedBy], [e].[Description], [e].[EndsAt], [e].[Slug], [e].[StartsAt], [e].[Status], [e].[Tags], [e].[Title], [e].[Venue]
+    FROM [OrderItems] AS [o0]
+    INNER JOIN [Events] AS [e] ON [o0].[EventId] = [e].[Id]
+) AS [t] ON [o].[Id] = [t].[OrderId]
+WHERE [o].[Status] = N'Pending' AND [o].[CreatedAt] < DATEADD(minute, CAST(-1.0E0 AS int), GETUTCDATE()) AND [o].[CreatedAt] > DATEADD(hour, CAST(-24.0E0 AS int), GETUTCDATE()) AND ([o].[StripePaymentIntentId] IS NULL OR [o].[StripePaymentIntentId] LIKE N'')
+ORDER BY [o].[Id], [t].[Id] {"EventId":{"Id":20101,"Name":"Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"},"MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:09:26.935 +00:00 DBG] Karta.WebAPI.Services.EventArchiveService Looking for events that should be archived (current time: "2025-12-24T15:09:26.9234146+00:00") {"MachineName":"59326a6f5604","ThreadId":79}
+[2025-12-24 15:09:27.080 +00:00 INF] Microsoft.EntityFrameworkCore.Database.Command Executed DbCommand (63ms) [Parameters=[@__now_0='?' (DbType = DateTimeOffset)], CommandType='"Text"', CommandTimeout='30']
+SELECT [e].[Id], [e].[Category], [e].[City], [e].[Country], [e].[CoverImageUrl], [e].[CreatedAt], [e].[CreatedBy], [e].[Description], [e].[EndsAt], [e].[Slug], [e].[StartsAt], [e].[Status], [e].[Tags], [e].[Title], [e].[Venue]
+FROM [Events] AS [e]
+WHERE [e].[Status] NOT IN (N'Archived', N'Cancelled') AND (([e].[EndsAt] IS NOT NULL AND [e].[EndsAt] < @__now_0) OR ([e].[EndsAt] IS NULL AND [e].[StartsAt] < @__now_0)) {"EventId":{"Id":20101,"Name":"Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"},"MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:09:27.087 +00:00 DBG] Karta.WebAPI.Services.EventArchiveService No events to archive {"MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:09:27.164 +00:00 DBG] Karta.WebAPI.Services.OrderCleanupService Looking for Pending orders older than "2025-12-23T15:09:27.1643450Z" {"MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:09:27.185 +00:00 INF] Microsoft.EntityFrameworkCore.Database.Command Executed DbCommand (11ms) [Parameters=[@__cutoffTime_0='?' (DbType = DateTime2)], CommandType='"Text"', CommandTimeout='30']
+SELECT [o].[Id], [o].[CreatedAt], [o].[Currency], [o].[Status], [o].[StripePaymentIntentId], [o].[TotalAmount], [o].[UserId]
+FROM [Orders] AS [o]
+WHERE [o].[Status] = N'Pending' AND [o].[CreatedAt] < @__cutoffTime_0 {"EventId":{"Id":20101,"Name":"Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"},"MachineName":"59326a6f5604","ThreadId":79}
+[2025-12-24 15:09:27.193 +00:00 DBG] Karta.WebAPI.Services.OrderCleanupService No expired orders found {"MachineName":"59326a6f5604","ThreadId":79}
+[2025-12-24 15:09:47.874 +00:00 INF] Microsoft.AspNetCore.Hosting.Diagnostics Request starting HTTP/1.1 GET http://localhost:8080/ - null null {"EventId":{"Id":1},"RequestId":"0HNI2UO7JECKG:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKG","MachineName":"59326a6f5604","ThreadId":79}
+[2025-12-24 15:09:47.876 +00:00 INF] Microsoft.AspNetCore.Routing.EndpointMiddleware Executing endpoint 'HTTP: GET /' {"EventId":{"Name":"ExecutingEndpoint"},"RequestId":"0HNI2UO7JECKG:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKG","MachineName":"59326a6f5604","ThreadId":79}
+[2025-12-24 15:09:47.877 +00:00 INF] Microsoft.AspNetCore.Routing.EndpointMiddleware Executed endpoint 'HTTP: GET /' {"EventId":{"Id":1,"Name":"ExecutedEndpoint"},"RequestId":"0HNI2UO7JECKG:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKG","MachineName":"59326a6f5604","ThreadId":79}
+[2025-12-24 15:09:47.878 +00:00 INF] Microsoft.AspNetCore.Hosting.Diagnostics Request finished HTTP/1.1 GET http://localhost:8080/ - 200 null text/plain; charset=utf-8 3.9583ms {"EventId":{"Id":2},"RequestId":"0HNI2UO7JECKG:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKG","MachineName":"59326a6f5604","ThreadId":79}
+[2025-12-24 15:09:56.253 +00:00 INF] Microsoft.EntityFrameworkCore.Database.Command Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [o].[Id], [o].[CreatedAt], [o].[Currency], [o].[Status], [o].[StripePaymentIntentId], [o].[TotalAmount], [o].[UserId], [t].[Id], [t].[EventId], [t].[OrderId], [t].[PriceTierId], [t].[Qty], [t].[UnitPrice], [t].[Id0], [t].[Category], [t].[City], [t].[Country], [t].[CoverImageUrl], [t].[CreatedAt], [t].[CreatedBy], [t].[Description], [t].[EndsAt], [t].[Slug], [t].[StartsAt], [t].[Status], [t].[Tags], [t].[Title], [t].[Venue]
+FROM [Orders] AS [o]
+LEFT JOIN (
+    SELECT [o0].[Id], [o0].[EventId], [o0].[OrderId], [o0].[PriceTierId], [o0].[Qty], [o0].[UnitPrice], [e].[Id] AS [Id0], [e].[Category], [e].[City], [e].[Country], [e].[CoverImageUrl], [e].[CreatedAt], [e].[CreatedBy], [e].[Description], [e].[EndsAt], [e].[Slug], [e].[StartsAt], [e].[Status], [e].[Tags], [e].[Title], [e].[Venue]
+    FROM [OrderItems] AS [o0]
+    INNER JOIN [Events] AS [e] ON [o0].[EventId] = [e].[Id]
+) AS [t] ON [o].[Id] = [t].[OrderId]
+WHERE [o].[Status] = N'Pending' AND [o].[CreatedAt] < DATEADD(minute, CAST(-1.0E0 AS int), GETUTCDATE()) AND [o].[CreatedAt] > DATEADD(hour, CAST(-24.0E0 AS int), GETUTCDATE()) AND [o].[StripePaymentIntentId] IS NOT NULL AND [o].[StripePaymentIntentId] NOT LIKE N''
+ORDER BY [o].[Id], [t].[Id] {"EventId":{"Id":20101,"Name":"Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"},"MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:09:56.256 +00:00 INF] Microsoft.EntityFrameworkCore.Database.Command Executed DbCommand (1ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [o].[Id], [o].[CreatedAt], [o].[Currency], [o].[Status], [o].[StripePaymentIntentId], [o].[TotalAmount], [o].[UserId], [t].[Id], [t].[EventId], [t].[OrderId], [t].[PriceTierId], [t].[Qty], [t].[UnitPrice], [t].[Id0], [t].[Category], [t].[City], [t].[Country], [t].[CoverImageUrl], [t].[CreatedAt], [t].[CreatedBy], [t].[Description], [t].[EndsAt], [t].[Slug], [t].[StartsAt], [t].[Status], [t].[Tags], [t].[Title], [t].[Venue]
+FROM [Orders] AS [o]
+LEFT JOIN (
+    SELECT [o0].[Id], [o0].[EventId], [o0].[OrderId], [o0].[PriceTierId], [o0].[Qty], [o0].[UnitPrice], [e].[Id] AS [Id0], [e].[Category], [e].[City], [e].[Country], [e].[CoverImageUrl], [e].[CreatedAt], [e].[CreatedBy], [e].[Description], [e].[EndsAt], [e].[Slug], [e].[StartsAt], [e].[Status], [e].[Tags], [e].[Title], [e].[Venue]
+    FROM [OrderItems] AS [o0]
+    INNER JOIN [Events] AS [e] ON [o0].[EventId] = [e].[Id]
+) AS [t] ON [o].[Id] = [t].[OrderId]
+WHERE [o].[Status] = N'Pending' AND [o].[CreatedAt] < DATEADD(minute, CAST(-1.0E0 AS int), GETUTCDATE()) AND [o].[CreatedAt] > DATEADD(hour, CAST(-24.0E0 AS int), GETUTCDATE()) AND ([o].[StripePaymentIntentId] IS NULL OR [o].[StripePaymentIntentId] LIKE N'')
+ORDER BY [o].[Id], [t].[Id] {"EventId":{"Id":20101,"Name":"Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"},"MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:10:18.009 +00:00 INF] Microsoft.AspNetCore.Hosting.Diagnostics Request starting HTTP/1.1 GET http://localhost:8080/ - null null {"EventId":{"Id":1},"RequestId":"0HNI2UO7JECKH:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKH","MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:10:18.011 +00:00 INF] Microsoft.AspNetCore.Routing.EndpointMiddleware Executing endpoint 'HTTP: GET /' {"EventId":{"Name":"ExecutingEndpoint"},"RequestId":"0HNI2UO7JECKH:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKH","MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:10:18.012 +00:00 INF] Microsoft.AspNetCore.Routing.EndpointMiddleware Executed endpoint 'HTTP: GET /' {"EventId":{"Id":1,"Name":"ExecutedEndpoint"},"RequestId":"0HNI2UO7JECKH:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKH","MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:10:18.014 +00:00 INF] Microsoft.AspNetCore.Hosting.Diagnostics Request finished HTTP/1.1 GET http://localhost:8080/ - 200 null text/plain; charset=utf-8 4.1879ms {"EventId":{"Id":2},"RequestId":"0HNI2UO7JECKH:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKH","MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:10:26.266 +00:00 INF] Microsoft.EntityFrameworkCore.Database.Command Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [o].[Id], [o].[CreatedAt], [o].[Currency], [o].[Status], [o].[StripePaymentIntentId], [o].[TotalAmount], [o].[UserId], [t].[Id], [t].[EventId], [t].[OrderId], [t].[PriceTierId], [t].[Qty], [t].[UnitPrice], [t].[Id0], [t].[Category], [t].[City], [t].[Country], [t].[CoverImageUrl], [t].[CreatedAt], [t].[CreatedBy], [t].[Description], [t].[EndsAt], [t].[Slug], [t].[StartsAt], [t].[Status], [t].[Tags], [t].[Title], [t].[Venue]
+FROM [Orders] AS [o]
+LEFT JOIN (
+    SELECT [o0].[Id], [o0].[EventId], [o0].[OrderId], [o0].[PriceTierId], [o0].[Qty], [o0].[UnitPrice], [e].[Id] AS [Id0], [e].[Category], [e].[City], [e].[Country], [e].[CoverImageUrl], [e].[CreatedAt], [e].[CreatedBy], [e].[Description], [e].[EndsAt], [e].[Slug], [e].[StartsAt], [e].[Status], [e].[Tags], [e].[Title], [e].[Venue]
+    FROM [OrderItems] AS [o0]
+    INNER JOIN [Events] AS [e] ON [o0].[EventId] = [e].[Id]
+) AS [t] ON [o].[Id] = [t].[OrderId]
+WHERE [o].[Status] = N'Pending' AND [o].[CreatedAt] < DATEADD(minute, CAST(-1.0E0 AS int), GETUTCDATE()) AND [o].[CreatedAt] > DATEADD(hour, CAST(-24.0E0 AS int), GETUTCDATE()) AND [o].[StripePaymentIntentId] IS NOT NULL AND [o].[StripePaymentIntentId] NOT LIKE N''
+ORDER BY [o].[Id], [t].[Id] {"EventId":{"Id":20101,"Name":"Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"},"MachineName":"59326a6f5604","ThreadId":78}
+[2025-12-24 15:10:26.271 +00:00 INF] Microsoft.EntityFrameworkCore.Database.Command Executed DbCommand (3ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [o].[Id], [o].[CreatedAt], [o].[Currency], [o].[Status], [o].[StripePaymentIntentId], [o].[TotalAmount], [o].[UserId], [t].[Id], [t].[EventId], [t].[OrderId], [t].[PriceTierId], [t].[Qty], [t].[UnitPrice], [t].[Id0], [t].[Category], [t].[City], [t].[Country], [t].[CoverImageUrl], [t].[CreatedAt], [t].[CreatedBy], [t].[Description], [t].[EndsAt], [t].[Slug], [t].[StartsAt], [t].[Status], [t].[Tags], [t].[Title], [t].[Venue]
+FROM [Orders] AS [o]
+LEFT JOIN (
+    SELECT [o0].[Id], [o0].[EventId], [o0].[OrderId], [o0].[PriceTierId], [o0].[Qty], [o0].[UnitPrice], [e].[Id] AS [Id0], [e].[Category], [e].[City], [e].[Country], [e].[CoverImageUrl], [e].[CreatedAt], [e].[CreatedBy], [e].[Description], [e].[EndsAt], [e].[Slug], [e].[StartsAt], [e].[Status], [e].[Tags], [e].[Title], [e].[Venue]
+    FROM [OrderItems] AS [o0]
+    INNER JOIN [Events] AS [e] ON [o0].[EventId] = [e].[Id]
+) AS [t] ON [o].[Id] = [t].[OrderId]
+WHERE [o].[Status] = N'Pending' AND [o].[CreatedAt] < DATEADD(minute, CAST(-1.0E0 AS int), GETUTCDATE()) AND [o].[CreatedAt] > DATEADD(hour, CAST(-24.0E0 AS int), GETUTCDATE()) AND ([o].[StripePaymentIntentId] IS NULL OR [o].[StripePaymentIntentId] LIKE N'')
+ORDER BY [o].[Id], [t].[Id] {"EventId":{"Id":20101,"Name":"Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"},"MachineName":"59326a6f5604","ThreadId":77}
+[2025-12-24 15:10:48.126 +00:00 INF] Microsoft.AspNetCore.Hosting.Diagnostics Request starting HTTP/1.1 GET http://localhost:8080/ - null null {"EventId":{"Id":1},"RequestId":"0HNI2UO7JECKI:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKI","MachineName":"59326a6f5604","ThreadId":79}
+[2025-12-24 15:10:48.127 +00:00 INF] Microsoft.AspNetCore.Routing.EndpointMiddleware Executing endpoint 'HTTP: GET /' {"EventId":{"Name":"ExecutingEndpoint"},"RequestId":"0HNI2UO7JECKI:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKI","MachineName":"59326a6f5604","ThreadId":79}
+[2025-12-24 15:10:48.128 +00:00 INF] Microsoft.AspNetCore.Routing.EndpointMiddleware Executed endpoint 'HTTP: GET /' {"EventId":{"Id":1,"Name":"ExecutedEndpoint"},"RequestId":"0HNI2UO7JECKI:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKI","MachineName":"59326a6f5604","ThreadId":79}
+[2025-12-24 15:10:48.128 +00:00 INF] Microsoft.AspNetCore.Hosting.Diagnostics Request finished HTTP/1.1 GET http://localhost:8080/ - 200 null text/plain; charset=utf-8 2.304ms {"EventId":{"Id":2},"RequestId":"0HNI2UO7JECKI:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKI","MachineName":"59326a6f5604","ThreadId":79}
+[2025-12-24 15:10:56.279 +00:00 INF] Microsoft.EntityFrameworkCore.Database.Command Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [o].[Id], [o].[CreatedAt], [o].[Currency], [o].[Status], [o].[StripePaymentIntentId], [o].[TotalAmount], [o].[UserId], [t].[Id], [t].[EventId], [t].[OrderId], [t].[PriceTierId], [t].[Qty], [t].[UnitPrice], [t].[Id0], [t].[Category], [t].[City], [t].[Country], [t].[CoverImageUrl], [t].[CreatedAt], [t].[CreatedBy], [t].[Description], [t].[EndsAt], [t].[Slug], [t].[StartsAt], [t].[Status], [t].[Tags], [t].[Title], [t].[Venue]
+FROM [Orders] AS [o]
+LEFT JOIN (
+    SELECT [o0].[Id], [o0].[EventId], [o0].[OrderId], [o0].[PriceTierId], [o0].[Qty], [o0].[UnitPrice], [e].[Id] AS [Id0], [e].[Category], [e].[City], [e].[Country], [e].[CoverImageUrl], [e].[CreatedAt], [e].[CreatedBy], [e].[Description], [e].[EndsAt], [e].[Slug], [e].[StartsAt], [e].[Status], [e].[Tags], [e].[Title], [e].[Venue]
+    FROM [OrderItems] AS [o0]
+    INNER JOIN [Events] AS [e] ON [o0].[EventId] = [e].[Id]
+) AS [t] ON [o].[Id] = [t].[OrderId]
+WHERE [o].[Status] = N'Pending' AND [o].[CreatedAt] < DATEADD(minute, CAST(-1.0E0 AS int), GETUTCDATE()) AND [o].[CreatedAt] > DATEADD(hour, CAST(-24.0E0 AS int), GETUTCDATE()) AND [o].[StripePaymentIntentId] IS NOT NULL AND [o].[StripePaymentIntentId] NOT LIKE N''
+ORDER BY [o].[Id], [t].[Id] {"EventId":{"Id":20101,"Name":"Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"},"MachineName":"59326a6f5604","ThreadId":79}
+[2025-12-24 15:10:56.282 +00:00 INF] Microsoft.EntityFrameworkCore.Database.Command Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [o].[Id], [o].[CreatedAt], [o].[Currency], [o].[Status], [o].[StripePaymentIntentId], [o].[TotalAmount], [o].[UserId], [t].[Id], [t].[EventId], [t].[OrderId], [t].[PriceTierId], [t].[Qty], [t].[UnitPrice], [t].[Id0], [t].[Category], [t].[City], [t].[Country], [t].[CoverImageUrl], [t].[CreatedAt], [t].[CreatedBy], [t].[Description], [t].[EndsAt], [t].[Slug], [t].[StartsAt], [t].[Status], [t].[Tags], [t].[Title], [t].[Venue]
+FROM [Orders] AS [o]
+LEFT JOIN (
+    SELECT [o0].[Id], [o0].[EventId], [o0].[OrderId], [o0].[PriceTierId], [o0].[Qty], [o0].[UnitPrice], [e].[Id] AS [Id0], [e].[Category], [e].[City], [e].[Country], [e].[CoverImageUrl], [e].[CreatedAt], [e].[CreatedBy], [e].[Description], [e].[EndsAt], [e].[Slug], [e].[StartsAt], [e].[Status], [e].[Tags], [e].[Title], [e].[Venue]
+    FROM [OrderItems] AS [o0]
+    INNER JOIN [Events] AS [e] ON [o0].[EventId] = [e].[Id]
+) AS [t] ON [o].[Id] = [t].[OrderId]
+WHERE [o].[Status] = N'Pending' AND [o].[CreatedAt] < DATEADD(minute, CAST(-1.0E0 AS int), GETUTCDATE()) AND [o].[CreatedAt] > DATEADD(hour, CAST(-24.0E0 AS int), GETUTCDATE()) AND ([o].[StripePaymentIntentId] IS NULL OR [o].[StripePaymentIntentId] LIKE N'')
+ORDER BY [o].[Id], [t].[Id] {"EventId":{"Id":20101,"Name":"Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"},"MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:11:18.236 +00:00 INF] Microsoft.AspNetCore.Hosting.Diagnostics Request starting HTTP/1.1 GET http://localhost:8080/ - null null {"EventId":{"Id":1},"RequestId":"0HNI2UO7JECKJ:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKJ","MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:11:18.238 +00:00 INF] Microsoft.AspNetCore.Routing.EndpointMiddleware Executing endpoint 'HTTP: GET /' {"EventId":{"Name":"ExecutingEndpoint"},"RequestId":"0HNI2UO7JECKJ:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKJ","MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:11:18.240 +00:00 INF] Microsoft.AspNetCore.Routing.EndpointMiddleware Executed endpoint 'HTTP: GET /' {"EventId":{"Id":1,"Name":"ExecutedEndpoint"},"RequestId":"0HNI2UO7JECKJ:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKJ","MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:11:18.241 +00:00 INF] Microsoft.AspNetCore.Hosting.Diagnostics Request finished HTTP/1.1 GET http://localhost:8080/ - 200 null text/plain; charset=utf-8 5.1474ms {"EventId":{"Id":2},"RequestId":"0HNI2UO7JECKJ:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKJ","MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:11:26.289 +00:00 INF] Microsoft.EntityFrameworkCore.Database.Command Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [o].[Id], [o].[CreatedAt], [o].[Currency], [o].[Status], [o].[StripePaymentIntentId], [o].[TotalAmount], [o].[UserId], [t].[Id], [t].[EventId], [t].[OrderId], [t].[PriceTierId], [t].[Qty], [t].[UnitPrice], [t].[Id0], [t].[Category], [t].[City], [t].[Country], [t].[CoverImageUrl], [t].[CreatedAt], [t].[CreatedBy], [t].[Description], [t].[EndsAt], [t].[Slug], [t].[StartsAt], [t].[Status], [t].[Tags], [t].[Title], [t].[Venue]
+FROM [Orders] AS [o]
+LEFT JOIN (
+    SELECT [o0].[Id], [o0].[EventId], [o0].[OrderId], [o0].[PriceTierId], [o0].[Qty], [o0].[UnitPrice], [e].[Id] AS [Id0], [e].[Category], [e].[City], [e].[Country], [e].[CoverImageUrl], [e].[CreatedAt], [e].[CreatedBy], [e].[Description], [e].[EndsAt], [e].[Slug], [e].[StartsAt], [e].[Status], [e].[Tags], [e].[Title], [e].[Venue]
+    FROM [OrderItems] AS [o0]
+    INNER JOIN [Events] AS [e] ON [o0].[EventId] = [e].[Id]
+) AS [t] ON [o].[Id] = [t].[OrderId]
+WHERE [o].[Status] = N'Pending' AND [o].[CreatedAt] < DATEADD(minute, CAST(-1.0E0 AS int), GETUTCDATE()) AND [o].[CreatedAt] > DATEADD(hour, CAST(-24.0E0 AS int), GETUTCDATE()) AND [o].[StripePaymentIntentId] IS NOT NULL AND [o].[StripePaymentIntentId] NOT LIKE N''
+ORDER BY [o].[Id], [t].[Id] {"EventId":{"Id":20101,"Name":"Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"},"MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:11:26.293 +00:00 INF] Microsoft.EntityFrameworkCore.Database.Command Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [o].[Id], [o].[CreatedAt], [o].[Currency], [o].[Status], [o].[StripePaymentIntentId], [o].[TotalAmount], [o].[UserId], [t].[Id], [t].[EventId], [t].[OrderId], [t].[PriceTierId], [t].[Qty], [t].[UnitPrice], [t].[Id0], [t].[Category], [t].[City], [t].[Country], [t].[CoverImageUrl], [t].[CreatedAt], [t].[CreatedBy], [t].[Description], [t].[EndsAt], [t].[Slug], [t].[StartsAt], [t].[Status], [t].[Tags], [t].[Title], [t].[Venue]
+FROM [Orders] AS [o]
+LEFT JOIN (
+    SELECT [o0].[Id], [o0].[EventId], [o0].[OrderId], [o0].[PriceTierId], [o0].[Qty], [o0].[UnitPrice], [e].[Id] AS [Id0], [e].[Category], [e].[City], [e].[Country], [e].[CoverImageUrl], [e].[CreatedAt], [e].[CreatedBy], [e].[Description], [e].[EndsAt], [e].[Slug], [e].[StartsAt], [e].[Status], [e].[Tags], [e].[Title], [e].[Venue]
+    FROM [OrderItems] AS [o0]
+    INNER JOIN [Events] AS [e] ON [o0].[EventId] = [e].[Id]
+) AS [t] ON [o].[Id] = [t].[OrderId]
+WHERE [o].[Status] = N'Pending' AND [o].[CreatedAt] < DATEADD(minute, CAST(-1.0E0 AS int), GETUTCDATE()) AND [o].[CreatedAt] > DATEADD(hour, CAST(-24.0E0 AS int), GETUTCDATE()) AND ([o].[StripePaymentIntentId] IS NULL OR [o].[StripePaymentIntentId] LIKE N'')
+ORDER BY [o].[Id], [t].[Id] {"EventId":{"Id":20101,"Name":"Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"},"MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:11:48.354 +00:00 INF] Microsoft.AspNetCore.Hosting.Diagnostics Request starting HTTP/1.1 GET http://localhost:8080/ - null null {"EventId":{"Id":1},"RequestId":"0HNI2UO7JECKK:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKK","MachineName":"59326a6f5604","ThreadId":77}
+[2025-12-24 15:11:48.355 +00:00 INF] Microsoft.AspNetCore.Routing.EndpointMiddleware Executing endpoint 'HTTP: GET /' {"EventId":{"Name":"ExecutingEndpoint"},"RequestId":"0HNI2UO7JECKK:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKK","MachineName":"59326a6f5604","ThreadId":77}
+[2025-12-24 15:11:48.356 +00:00 INF] Microsoft.AspNetCore.Routing.EndpointMiddleware Executed endpoint 'HTTP: GET /' {"EventId":{"Id":1,"Name":"ExecutedEndpoint"},"RequestId":"0HNI2UO7JECKK:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKK","MachineName":"59326a6f5604","ThreadId":77}
+[2025-12-24 15:11:48.356 +00:00 INF] Microsoft.AspNetCore.Hosting.Diagnostics Request finished HTTP/1.1 GET http://localhost:8080/ - 200 null text/plain; charset=utf-8 2.0676ms {"EventId":{"Id":2},"RequestId":"0HNI2UO7JECKK:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKK","MachineName":"59326a6f5604","ThreadId":77}
+[2025-12-24 15:11:56.303 +00:00 INF] Microsoft.EntityFrameworkCore.Database.Command Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [o].[Id], [o].[CreatedAt], [o].[Currency], [o].[Status], [o].[StripePaymentIntentId], [o].[TotalAmount], [o].[UserId], [t].[Id], [t].[EventId], [t].[OrderId], [t].[PriceTierId], [t].[Qty], [t].[UnitPrice], [t].[Id0], [t].[Category], [t].[City], [t].[Country], [t].[CoverImageUrl], [t].[CreatedAt], [t].[CreatedBy], [t].[Description], [t].[EndsAt], [t].[Slug], [t].[StartsAt], [t].[Status], [t].[Tags], [t].[Title], [t].[Venue]
+FROM [Orders] AS [o]
+LEFT JOIN (
+    SELECT [o0].[Id], [o0].[EventId], [o0].[OrderId], [o0].[PriceTierId], [o0].[Qty], [o0].[UnitPrice], [e].[Id] AS [Id0], [e].[Category], [e].[City], [e].[Country], [e].[CoverImageUrl], [e].[CreatedAt], [e].[CreatedBy], [e].[Description], [e].[EndsAt], [e].[Slug], [e].[StartsAt], [e].[Status], [e].[Tags], [e].[Title], [e].[Venue]
+    FROM [OrderItems] AS [o0]
+    INNER JOIN [Events] AS [e] ON [o0].[EventId] = [e].[Id]
+) AS [t] ON [o].[Id] = [t].[OrderId]
+WHERE [o].[Status] = N'Pending' AND [o].[CreatedAt] < DATEADD(minute, CAST(-1.0E0 AS int), GETUTCDATE()) AND [o].[CreatedAt] > DATEADD(hour, CAST(-24.0E0 AS int), GETUTCDATE()) AND [o].[StripePaymentIntentId] IS NOT NULL AND [o].[StripePaymentIntentId] NOT LIKE N''
+ORDER BY [o].[Id], [t].[Id] {"EventId":{"Id":20101,"Name":"Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"},"MachineName":"59326a6f5604","ThreadId":77}
+[2025-12-24 15:11:56.306 +00:00 INF] Microsoft.EntityFrameworkCore.Database.Command Executed DbCommand (2ms) [Parameters=[], CommandType='"Text"', CommandTimeout='30']
+SELECT [o].[Id], [o].[CreatedAt], [o].[Currency], [o].[Status], [o].[StripePaymentIntentId], [o].[TotalAmount], [o].[UserId], [t].[Id], [t].[EventId], [t].[OrderId], [t].[PriceTierId], [t].[Qty], [t].[UnitPrice], [t].[Id0], [t].[Category], [t].[City], [t].[Country], [t].[CoverImageUrl], [t].[CreatedAt], [t].[CreatedBy], [t].[Description], [t].[EndsAt], [t].[Slug], [t].[StartsAt], [t].[Status], [t].[Tags], [t].[Title], [t].[Venue]
+FROM [Orders] AS [o]
+LEFT JOIN (
+    SELECT [o0].[Id], [o0].[EventId], [o0].[OrderId], [o0].[PriceTierId], [o0].[Qty], [o0].[UnitPrice], [e].[Id] AS [Id0], [e].[Category], [e].[City], [e].[Country], [e].[CoverImageUrl], [e].[CreatedAt], [e].[CreatedBy], [e].[Description], [e].[EndsAt], [e].[Slug], [e].[StartsAt], [e].[Status], [e].[Tags], [e].[Title], [e].[Venue]
+    FROM [OrderItems] AS [o0]
+    INNER JOIN [Events] AS [e] ON [o0].[EventId] = [e].[Id]
+) AS [t] ON [o].[Id] = [t].[OrderId]
+WHERE [o].[Status] = N'Pending' AND [o].[CreatedAt] < DATEADD(minute, CAST(-1.0E0 AS int), GETUTCDATE()) AND [o].[CreatedAt] > DATEADD(hour, CAST(-24.0E0 AS int), GETUTCDATE()) AND ([o].[StripePaymentIntentId] IS NULL OR [o].[StripePaymentIntentId] LIKE N'')
+ORDER BY [o].[Id], [t].[Id] {"EventId":{"Id":20101,"Name":"Microsoft.EntityFrameworkCore.Database.Command.CommandExecuted"},"MachineName":"59326a6f5604","ThreadId":77}
+[2025-12-24 15:12:18.420 +00:00 INF] Microsoft.AspNetCore.Hosting.Diagnostics Request starting HTTP/1.1 GET http://localhost:8080/ - null null {"EventId":{"Id":1},"RequestId":"0HNI2UO7JECKL:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKL","MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:12:18.422 +00:00 INF] Microsoft.AspNetCore.Routing.EndpointMiddleware Executing endpoint 'HTTP: GET /' {"EventId":{"Name":"ExecutingEndpoint"},"RequestId":"0HNI2UO7JECKL:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKL","MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:12:18.424 +00:00 INF] Microsoft.AspNetCore.Routing.EndpointMiddleware Executed endpoint 'HTTP: GET /' {"EventId":{"Id":1,"Name":"ExecutedEndpoint"},"RequestId":"0HNI2UO7JECKL:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKL","MachineName":"59326a6f5604","ThreadId":40}
+[2025-12-24 15:12:18.426 +00:00 INF] Microsoft.AspNetCore.Hosting.Diagnostics Request finished HTTP/1.1 GET http://localhost:8080/ - 200 null text/plain; charset=utf-8 5.4142ms {"EventId":{"Id":2},"RequestId":"0HNI2UO7JECKL:00000001","RequestPath":"/","ConnectionId":"0HNI2UO7JECKL","MachineName":"59326a6f5604","ThreadId":40}
